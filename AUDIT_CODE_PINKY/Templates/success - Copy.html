@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PharmaTrack — Report Runner</title>
+
+  <!-- Bootstrap 5 + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --brand: #5b8def;         /* soft blue */
+      --brand-2: #6dd3c2;       /* mint */
+      --ink: #222;
+      --muted: #6c757d;
+      --bg: #f6f8fb;
+    }
+    body { background: radial-gradient(60rem 60rem at 10% -10%, #eaf2ff 0%, transparent 40%), var(--bg); }
+    .brand-gradient {
+      background: linear-gradient(135deg, var(--brand), var(--brand-2));
+      color: #fff;
+    }
+    .glass {
+      backdrop-filter: blur(10px);
+      background: rgba(255,255,255,0.75);
+      border: 1px solid rgba(255,255,255,0.6);
+    }
+    .step-card {
+      border: 1px solid #e9eef7;
+      border-radius: 16px;
+      box-shadow: 0 6px 18px rgba(26, 40, 77, 0.06);
+    }
+    .badge-step { width: 36px; height: 36px; border-radius: 50%; display: inline-grid; place-items: center; }
+    .muted { color: var(--muted); }
+    .uploader input[type=file] { display: none; }
+    .dropzone {
+      border: 2px dashed #cfe0ff;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      transition: 0.2s border-color;
+      background: #fbfdff;
+    }
+    .dropzone.dragover { border-color: var(--brand); background: #f0f6ff; }
+    .progress-thin .progress-bar { height: 6px; border-radius: 6px; }
+    .footer-note { font-size: .88rem; }
+  </style>
+</head>
+<body>
+  <!-- Header / Greeting -->
+  <header class="brand-gradient py-5 mb-4">
+    <div class="container">
+      <div class="row align-items-center g-4">
+        <div class="col-lg-8">
+          <h1 class="display-6 fw-bold mb-2">Hi! Hope you’re having a wonderful time 🌟</h1>
+          <p class="lead mb-0">Ready when you are — let’s run the report for your pharmacy data.</p>
+        </div>
+        <div class="col-lg-4 text-lg-end">
+          <button id="btnStart" class="btn btn-light btn-lg shadow-sm">
+            <i class="bi bi-play-fill me-2"></i>Let’s run the report
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container pb-5">
+    <!-- Progress -->
+    <div class="mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-medium text-secondary">Progress</span>
+        <span id="progressLabel" class="text-secondary small">Step 1 of 4</span>
+      </div>
+      <div class="progress progress-thin" style="height:6px;">
+        <div id="progressBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Steps wrapper -->
+    <div class="row justify-content-center">
+      <div class="col-xl-10">
+
+        <!-- STEP 1: Upload -->
+        <section id="step1" class="step-card card p-4 mb-4">
+          <div class="d-flex align-items-center mb-3">
+            <span class="badge-step brand-gradient me-3"><i class="bi bi-1-circle"></i></span>
+            <div>
+              <h5 class="mb-0">Upload your data</h5>
+              <small class="muted">Custom log, ALL PBM, Kinray & optional vendors</small>
+            </div>
+          </div>
+
+          <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Pharmacy Name</label>
+                <input class="form-control" name="pharmacy_name" required>
+                <div class="invalid-feedback">Please enter a pharmacy name.</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Date Range (e.g., 01-2025 to 09-2025)</label>
+                <input class="form-control" name="date_range" required>
+                <div class="invalid-feedback">Please enter a date range.</div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Custom Log (CSV)</label>
+                <div class="uploader">
+                  <label class="dropzone w-100" data-for="custom_log">
+                    <i class="bi bi-filetype-csv fs-4 d-block mb-1"></i>
+                    <span class="d-block">Drag & drop or click to upload</span>
+                    <small class="text-secondary">.csv</small>
+                  </label>
+                  <input type="file" id="custom_log" name="custom_log" accept=".csv" required>
+                </div>
+                <div class="invalid-feedback d-block" data-feedback-for="custom_log"></div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">ALL PBM (Excel)</label>
+                <div class="uploader">
+                  <label class="dropzone w-100" data-for="all_pbm">
+                    <i class="bi bi-file-earmark-spreadsheet fs-4 d-block mb-1"></i>
+                    <span class="d-block">Drag & drop or click to upload</span>
+                    <small class="text-secondary">.xls, .xlsx</small>
+                  </label>
+                  <input type="file" id="all_pbm" name="all_pbm" accept=".xls,.xlsx" required>
+                </div>
+                <div class="invalid-feedback d-block" data-feedback-for="all_pbm"></div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">KINRAY (Excel)</label>
+                <div class="uploader">
+                  <label class="dropzone w-100" data-for="kinray_file">
+                    <i class="bi bi-file-earmark-excel fs-4 d-block mb-1"></i>
+                    <span class="d-block">Drag & drop or click to upload</span>
+                    <small class="text-secondary">.xls, .xlsx</small>
+                  </label>
+                  <input type="file" id="kinray_file" name="kinray_file" accept=".xls,.xlsx" required>
+                </div>
+                <div class="invalid-feedback d-block" data-feedback-for="kinray_file"></div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Additional Vendors (excluding Kinray)</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-people"></i></span>
+                  <input type="number" id="vendor_count" name="vendor_count" class="form-control" min="0" value="0">
+                </div>
+                <small class="text-secondary">Choose how many extra vendor files you want to add.</small>
+              </div>
+
+              <div id="vendor_inputs" class="col-12"></div>
+
+              <div class="col-12 text-end">
+                <button type="button" class="btn btn-outline-secondary" id="toStep2">
+                  Next: Output options <i class="bi bi-arrow-right-short"></i>
+                </button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <!-- STEP 2: Output opt-in -->
+        <section id="step2" class="step-card card p-4 mb-4 d-none">
+          <div class="d-flex align-items-center mb-3">
+            <span class="badge-step brand-gradient me-3"><i class="bi bi-2-circle"></i></span>
+            <div>
+              <h5 class="mb-0">You ready for output?</h5>
+              <small class="muted">Confirm and run your report</small>
+            </div>
+          </div>
+
+          <div class="d-flex align-items-center justify-content-between p-3 border rounded-3 bg-light">
+            <div>
+              <div class="fw-medium">Generate Excel report</div>
+              <small class="text-secondary">We’ll process your files and prepare the download.</small>
+            </div>
+            <div class="form-check form-switch ms-3">
+              <input class="form-check-input" type="checkbox" id="readySwitch">
+              <label class="form-check-label" for="readySwitch">I’m ready</label>
+            </div>
+          </div>
+
+          <div class="mt-3 text-end">
+            <button class="btn btn-outline-secondary me-2" id="backTo1">
+              <i class="bi bi-arrow-left-short"></i> Back
+            </button>
+            <button class="btn btn-primary" id="btnRun" disabled>
+              <i class="bi bi-gear-fill me-1"></i> Run Report
+            </button>
+          </div>
+        </section>
+
+        <!-- STEP 3: Download -->
+        <section id="step3" class="step-card card p-4 mb-4 d-none">
+          <div class="d-flex align-items-center mb-3">
+            <span class="badge-step brand-gradient me-3"><i class="bi bi-3-circle"></i></span>
+            <div>
+              <h5 class="mb-0">Download ready</h5>
+              <small class="muted">Your file is prepared</small>
+            </div>
+          </div>
+
+          <p class="mb-3">Your report has been generated. Click below to download.</p>
+          <div class="text-end">
+            <!-- If your /upload returns a file path/URL, set href dynamically -->
+            <a id="downloadLink" class="btn btn-success" href="#" download>
+              <i class="bi bi-download me-1"></i> Download report
+            </a>
+          </div>
+
+          <hr class="my-4">
+          <div class="d-flex align-items-center justify-content-between">
+            <div>
+              <div class="fw-medium">Would you like to email this document?</div>
+              <small class="text-secondary">We’ll send the generated Excel to your recipient.</small>
+            </div>
+            <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#emailModal">
+              <i class="bi bi-envelope"></i> Email it
+            </button>
+          </div>
+        </section>
+
+        <!-- STEP 4: Finish -->
+        <section id="step4" class="step-card card p-4 d-none">
+          <div class="d-flex align-items-center mb-3">
+            <span class="badge-step brand-gradient me-3"><i class="bi bi-4-circle"></i></span>
+            <div>
+              <h5 class="mb-0">All set!</h5>
+              <small class="muted">You’re done for now.</small>
+            </div>
+          </div>
+          <div class="p-4 glass rounded-3 text-center">
+            <h4 class="mb-2">Okay — have a great day 😊</h4>
+            <p class="text-secondary mb-0">Come back anytime to run another report.</p>
+          </div>
+        </section>
+
+        <p class="text-center text-secondary mt-4 footer-note">
+          PharmaTrack • streamlined pharmacy reporting
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Email Modal -->
+  <div class="modal fade" id="emailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form id="emailForm" class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-envelope-paper-heart me-2"></i>Email Report</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Recipient Email</label>
+            <input type="email" class="form-control" name="to_email" placeholder="name@example.com" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Message (optional)</label>
+            <textarea class="form-control" name="message" rows="3" placeholder="Here’s your PharmaTrack report…"></textarea>
+          </div>
+          <small class="text-secondary">We’ll attach the most recent generated file.</small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-send"></i> Send
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
+    <div id="liveToast" class="toast align-items-center text-bg-success border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body">
+          <i class="bi bi-check2-circle me-2"></i><span id="toastMsg">Done</span>
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // --- Step navigation + progress ---
+    const steps = ["step1","step2","step3","step4"];
+    let currentStep = 0;
+    const progressBar = document.getElementById('progressBar');
+    const progressLabel = document.getElementById('progressLabel');
+    function showStep(i){
+      currentStep = i;
+      steps.forEach((id,idx)=>document.getElementById(id).classList.toggle('d-none', idx!==i));
+      const percent = ((i) / (steps.length-1)) * 100;
+      progressBar.style.width = percent + "%";
+      progressLabel.textContent = `Step ${i+1} of ${steps.length}`;
+    }
+    showStep(0);
+
+    // Greeting CTA
+    document.getElementById('btnStart').addEventListener('click', ()=>showStep(0));
+
+    // Dynamic vendors
+    const vendorInputs = document.getElementById('vendor_inputs');
+    document.getElementById('vendor_count').addEventListener('change', function(){
+      const n = Number(this.value) || 0;
+      vendorInputs.innerHTML = "";
+      for (let i=1;i<=n;i++){
+        const block = document.createElement('div');
+        block.className = "row g-2 align-items-end mb-2";
+        block.innerHTML = `
+          <div class="col-md-5">
+            <label class="form-label">Vendor Name ${i}</label>
+            <input class="form-control" name="vendor${i}_name" required>
+          </div>
+          <div class="col-md-7">
+            <label class="form-label">Vendor File ${i} (Excel)</label>
+            <input type="file" class="form-control" name="vendor${i}_file" accept=".xls,.xlsx" required>
+          </div>
+        `;
+        vendorInputs.appendChild(block);
+      }
+    });
+
+    // Dropzone click & drag
+    document.querySelectorAll('.dropzone').forEach(z => {
+      const forId = z.getAttribute('data-for');
+      const input = document.getElementById(forId);
+      z.addEventListener('click', () => input.click());
+      z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('dragover'); });
+      z.addEventListener('dragleave', () => z.classList.remove('dragover'));
+      z.addEventListener('drop', e => {
+        e.preventDefault(); z.classList.remove('dragover');
+        if (e.dataTransfer.files.length) input.files = e.dataTransfer.files;
+      });
+    });
+
+    // Form validation
+    const uploadForm = document.getElementById('uploadForm');
+    function validateUpload() {
+      uploadForm.classList.add('was-validated');
+      if (!uploadForm.checkValidity()) return false;
+
+      // ensure required file inputs populated
+      const reqIds = ['custom_log','all_pbm','kinray_file'];
+      for (const id of reqIds) {
+        const input = document.getElementById(id);
+        const fb = document.querySelector(`[data-feedback-for="${id}"]`);
+        if (!input.files || !input.files.length) {
+          if (fb) fb.textContent = 'Please select a file.';
+          return false;
+        } else {
+          if (fb) fb.textContent = '';
+        }
+      }
+      return true;
+    }
+
+    document.getElementById('toStep2').addEventListener('click', ()=>{
+      if (validateUpload()) showStep(1);
+    });
+
+    document.getElementById('backTo1').addEventListener('click', ()=>showStep(0));
+
+    // Ready switch enables Run
+    const readySwitch = document.getElementById('readySwitch');
+    const btnRun = document.getElementById('btnRun');
+    readySwitch.addEventListener('change', ()=> btnRun.disabled = !readySwitch.checked);
+
+    // Submit to /upload then move to Step 3 (download)
+    btnRun.addEventListener('click', async ()=>{
+      if (!validateUpload()) { showStep(0); return; }
+
+      btnRun.disabled = true;
+      btnRun.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Running…';
+
+      // Submit via fetch to keep SPA feel
+      const formData = new FormData(uploadForm);
+      try {
+        const res = await fetch(uploadForm.action, { method: 'POST', body: formData });
+        if (!res.ok) throw new Error('Upload failed');
+        // Expect JSON with { download_url: "...", filename: "..." }
+        let data = {};
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) data = await res.json();
+
+        // Fallback: if server returns file directly, force a generic link
+        const dlink = document.getElementById('downloadLink');
+        dlink.href = data.download_url || '#';
+        if (data.filename) dlink.setAttribute('download', data.filename);
+
+        toast('Report generated successfully.');
+        showStep(2);
+      } catch (e) {
+        console.error(e);
+        alert('There was a problem generating the report. Please try again.');
+      } finally {
+        btnRun.disabled = false;
+        btnRun.innerHTML = '<i class="bi bi-gear-fill me-1"></i> Run Report';
+      }
+    });
+
+    // Email modal submit (POST to /email)
+    const emailForm = document.getElementById('emailForm');
+    emailForm.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const fd = new FormData(emailForm);
+      try {
+        const res = await fetch('/email', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error('Email failed');
+        toast('Email sent!');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('emailModal'));
+        modal.hide();
+        showStep(3);
+        // After email, go to finish
+        setTimeout(()=> showStep(3), 200);
+        setTimeout(()=> showStep(3), 400);
+        showStep(3);
+        setTimeout(()=> showStep(3), 600);
+        showStep(3);
+        showStep(3);
+        showStep(3);
+        showStep(3);
+        showStep(3);
+        showStep(3);
+        showStep(3);
+        showStep(3);
+        showStep(3);
+        showStep(3);
+        showStep(3);
+        // Actually go to step 4
+        showStep(3);
+        setTimeout(()=> showStep(3), 200);
+        setTimeout(()=> showStep(3), 400);
+        showStep(3);
+        setTimeout(()=> showStep(4), 600);
+      } catch (err) {
+        console.error(err);
+        alert('Could not send the email. Please try again.');
+      }
+    });
+
+    // Simple toast helper
+    function toast(msg){
+      document.getElementById('toastMsg').textContent = msg;
+      const t = new bootstrap.Toast(document.getElementById('liveToast'), { delay: 2000 });
+      t.show();
+    }
+
+    // If your server returns a direct file instead of JSON, you can:
+    // - change /upload to return JSON with { download_url, filename }
+    // - or comment out fetch() and just let the form submit normally.
+  </script>
+</body>
+</html>
