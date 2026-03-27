@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PharmaTrack — Dashboard</title>
+
+  <!-- Google Font: DM Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Bootstrap 5 + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --brand: #0f4c81;
+      --brand-light: #1a6bb5;
+      --brand-soft: #e8f2ff;
+      --accent: #00c48c;
+      --bg: #f7f9fc;
+      --border: #e2e8f0;
+      --ink: #1a202c;
+      --muted: #64748b;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      color: var(--ink);
+      padding-bottom: 60px;
+    }
+
+    /* ── Navbar ── */
+    .pt-navbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 0;
+      position: sticky;
+      top: 0;
+      z-index: 1050;
+    }
+    .pt-logo-box {
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: inline-grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .pt-brand-name { font-weight: 600; font-size: 1.05rem; color: var(--ink); }
+    .pt-pharmacy-badge {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .pt-nav-btn {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--ink);
+      cursor: pointer;
+      transition: 0.15s all;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .pt-nav-btn:hover { background: var(--bg); border-color: #c3d9f5; color: var(--brand); }
+
+    /* ── Cards base ── */
+    .pt-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(15, 76, 129, 0.05);
+    }
+
+    /* ── Metric Cards ── */
+    .metric-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .metric-value {
+      font-size: 1.9rem;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    .metric-value.profit { color: #16a34a; }
+    .metric-delta {
+      font-size: 0.78rem;
+      font-weight: 500;
+      margin-top: 4px;
+    }
+    .delta-up   { color: #16a34a; }
+    .delta-warn { color: #d97706; }
+
+    /* ── Alert Cards ── */
+    .alert-card {
+      border-radius: 12px;
+      padding: 20px;
+      cursor: pointer;
+      transition: 0.15s transform, 0.15s box-shadow;
+    }
+    .alert-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+    .alert-card.red    { background: #fff5f5; border: 1px solid #fecaca; }
+    .alert-card.amber  { background: #fffbeb; border: 1px solid #fde68a; }
+    .alert-card.green  { background: #f0fdf4; border: 1px solid #bbf7d0; }
+    .alert-card.blue   { background: #eff6ff; border: 1px solid #bfdbfe; }
+
+    .alert-num {
+      font-size: 2.4rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .alert-card.red   .alert-num { color: #dc2626; }
+    .alert-card.amber .alert-num { color: #d97706; }
+    .alert-card.green .alert-num { color: #16a34a; }
+    .alert-card.blue  .alert-num { color: #2563eb; }
+
+    .alert-title { font-size: 0.85rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+    .alert-sub   { font-size: 0.75rem; color: var(--muted); margin-bottom: 10px; }
+    .alert-link  { font-size: 0.75rem; font-weight: 500; text-decoration: underline; cursor: pointer; }
+    .alert-card.red   .alert-link { color: #dc2626; }
+    .alert-card.amber .alert-link { color: #d97706; }
+    .alert-card.green .alert-link { color: #16a34a; }
+    .alert-card.blue  .alert-link { color: #2563eb; }
+
+    /* ── Table ── */
+    .disc-table { width: 100%; border-collapse: collapse; }
+    .disc-table th {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .disc-table td {
+      font-size: 0.85rem;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    .disc-table tr:last-child td { border-bottom: none; }
+    .status-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .pill-red     { background: #fee2e2; color: #b91c1c; }
+    .pill-green   { background: #dcfce7; color: #15803d; }
+    .pill-gray    { background: #f1f5f9; color: #475569; }
+
+    /* ── Revenue bars ── */
+    .rev-row { margin-bottom: 14px; }
+    .rev-row:last-child { margin-bottom: 0; }
+    .rev-label { font-size: 0.85rem; font-weight: 500; color: var(--ink); margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .rev-label span { color: var(--muted); font-weight: 400; }
+    .rev-track { background: #f1f5f9; border-radius: 6px; height: 8px; overflow: hidden; }
+    .rev-bar   { height: 100%; border-radius: 6px; }
+
+    /* ── Doctor list ── */
+    .doc-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .doc-row:last-child { border-bottom: none; }
+    .doc-rank { font-size: 0.8rem; color: var(--muted); width: 16px; flex-shrink: 0; }
+    .doc-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: inline-grid; place-items: center;
+      font-size: 0.72rem; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .doc-info { flex: 1; }
+    .doc-name { font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+    .doc-contact { font-size: 0.75rem; color: var(--muted); }
+    .doc-stats { text-align: right; flex-shrink: 0; }
+    .doc-rx  { font-size: 0.85rem; font-weight: 600; color: var(--ink); }
+    .doc-rev { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── Key insights ── */
+    .insight-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .insight-row:last-child { border-bottom: none; }
+    .insight-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      flex-shrink: 0; margin-top: 5px;
+    }
+    .dot-red   { background: #ef4444; }
+    .dot-amber { background: #f59e0b; }
+    .dot-green { background: #22c55e; }
+    .insight-title { font-size: 0.88rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+    .insight-sub   { font-size: 0.78rem; color: var(--muted); }
+
+    /* ── Section heading ── */
+    .section-heading {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+
+    /* ── Footer ── */
+    .app-footer {
+      position: fixed; bottom: 0; width: 100%;
+      text-align: center; font-size: 13px; color: #6c757d;
+      background: rgba(255,255,255,0.92); padding: 6px 0;
+      border-top: 1px solid var(--border); z-index: 1000;
+    }
+
+    /* ── Kinray clickable card + breakdown panel ── */
+    .metric.clickable { cursor: pointer; transition: all 0.15s; }
+    .metric.clickable:hover {
+      background: var(--color-background-primary);
+      border: 0.5px solid #185FA5;
+    }
+    .metric.active {
+      background: var(--color-background-primary);
+      border: 0.5px solid #185FA5;
+    }
+    .metric-hint {
+      font-size: 10px;
+      color: #185FA5;
+      margin-top: 6px;
+    }
+    .metric-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .panel {
+      background: var(--color-background-primary);
+      border: 0.5px solid var(--color-border-tertiary);
+      border-radius: 12px;
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.35s ease, opacity 0.25s ease;
+      margin-bottom: 12px;
+    }
+    .panel.open { max-height: 400px; opacity: 1; }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 0.5px solid var(--color-border-tertiary);
+    }
+    .panel-title { font-weight: 600; font-size: 0.9rem; }
+    .breakdown-grid { padding: 16px 20px; }
+    .breakdown-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .breakdown-label {
+      font-size: 13px;
+      width: 180px;
+      flex-shrink: 0;
+    }
+    .breakdown-bar-wrap {
+      flex: 1;
+      height: 8px;
+      background: var(--color-background-secondary);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .breakdown-bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+    .breakdown-value {
+      font-size: 13px;
+      font-weight: 500;
+      min-width: 90px;
+      text-align: right;
+    }
+    .breakdown-pct {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      min-width: 38px;
+      text-align: right;
+    }
+    .breakdown-total {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 500;
+      padding-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── NAVBAR ── -->
+  <nav class="pt-navbar">
+    <div class="container-fluid px-4 d-flex align-items-center gap-3 flex-wrap">
+      <!-- Left: logo + brand + pharmacy badge -->
+      <div class="d-flex align-items-center gap-2 me-2">
+        <span class="pt-logo-box">Rx</span>
+        <span class="pt-brand-name">PharmaTrack</span>
+      </div>
+      <span class="pt-pharmacy-badge">{{ pharmacy_name }} &mdash; {{ date_range }}</span>
+
+      <!-- Right: action buttons -->
+      <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
+        <button class="pt-nav-btn">New analysis</button>
+        <button class="pt-nav-btn">Download main<br>report</button>
+        <button class="pt-nav-btn">Download audit<br>report</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid px-4 pt-4">
+
+    <!-- ── METRIC CARDS ── -->
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100">
+          <div class="metric-label">Total Rx processed</div>
+          <div class="metric-value">{{ summary.total_rx | default(0) }}</div>
+          <div class="metric-delta delta-up"><i class="bi bi-arrow-up-short"></i>+312 vs last month</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100 metric">
+          <div class="metric-label">
+            Insurance paid (All PBM - BestRx)
+          </div>
+          <div class="metric-value">
+            ${{ '{:,.0f}'.format(summary.all_pbm_total | default(0)) }}
+          </div>
+          <div class="metric-sub">
+            Sum of Ins Paid Total · BestRx
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100 metric clickable"
+             id="kinray-card"
+             onclick="toggleKinray()">
+          <div class="metric-label">
+            Total purchased (Kinray)
+          </div>
+          <div class="metric-value">
+            ${{ '{:,.0f}'.format(summary.total_kinray | default(0)) }}
+          </div>
+          <div class="metric-sub">
+            {{ summary.kinray_rows | default(0) }} invoices &middot;
+            {{ summary.kinray_ndcs | default(0) }} NDCs
+          </div>
+          <div class="metric-hint">
+            Click to see breakdown
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100 metric">
+          <div class="metric-label">Net profit</div>
+          <div class="metric-value"
+               style="color:var(--color-text-secondary);font-size:14px;padding-top:6px">
+            Coming soon
+          </div>
+          <div class="metric-sub">
+            After full data verified
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── KINRAY BREAKDOWN PANEL ── -->
+    <div class="panel" id="kinray-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          Kinray purchase breakdown
+        </div>
+        <button onclick="toggleKinray()">×</button>
+      </div>
+      <div class="breakdown-grid">
+        {% set total_k = summary.total_kinray | default(1) %}
+        {% for item in summary.kinray_by_type | default([]) %}
+        <div class="breakdown-row">
+          <span class="breakdown-label">
+            {{ item.type }}
+          </span>
+          <div class="breakdown-bar-wrap">
+            <div class="breakdown-bar"
+                 data-w="{{ ((item.total/total_k)*100)|round(1) }}"
+                 style="width:0%;background:#185FA5">
+            </div>
+          </div>
+          <span class="breakdown-value">
+            ${{ '{:,.2f}'.format(item.total) }}
+          </span>
+          <span class="breakdown-pct">
+            {{ ((item.total/total_k)*100)|round(1) }}%
+          </span>
+        </div>
+        {% endfor %}
+        <hr/>
+        <div class="breakdown-total">
+          <span>Total</span>
+          <span>
+            ${{ '{:,.2f}'.format(summary.total_kinray | default(0)) }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ALERT CARDS ── -->
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="alert-card red h-100">
+          <div class="alert-num">103</div>
+          <div class="alert-title">Drugs need ordering</div>
+          <div class="alert-sub">Est. $8,420 in lost margin</div>
+          <div class="alert-link">View order list</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="alert-card amber h-100">
+          <div class="alert-num">45</div>
+          <div class="alert-title">Never purchased &mdash; check</div>
+          <div class="alert-sub">$12,300 at risk</div>
+          <div class="alert-link">Investigate now</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="alert-card green h-100">
+          <div class="alert-num">56</div>
+          <div class="alert-title">Drugs overstocked</div>
+          <div class="alert-sub">Do not order these items</div>
+          <div class="alert-link">View do-not-order list</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="alert-card blue h-100">
+          <div class="alert-num">1,878</div>
+          <div class="alert-title">Rx comparisons analyzed</div>
+          <div class="alert-sub">47 underpayments detected</div>
+          <div class="alert-link">View full comparison</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DISCREPANCIES + REVENUE ROW ── -->
+    <div class="row g-3 mb-3">
+
+      <!-- Left: Top discrepancies table -->
+      <div class="col-12 col-lg-6">
+        <div class="pt-card h-100">
+          <div class="section-heading">Top discrepancies by drug</div>
+          <table class="disc-table">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Drug name</th>
+                <th style="text-align:center;">Billed</th>
+                <th style="text-align:center;">Purchased</th>
+                <th style="text-align:right;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Atorvastatin 10mg</td>
+                <td style="text-align:center;">4.5 pkg</td>
+                <td style="text-align:center;">2.0 pkg</td>
+                <td style="text-align:right;"><span class="status-pill pill-red">-2.5 pkg</span></td>
+              </tr>
+              <tr>
+                <td>Metformin 500mg</td>
+                <td style="text-align:center;">3.0 pkg</td>
+                <td style="text-align:center;">4.2 pkg</td>
+                <td style="text-align:right;"><span class="status-pill pill-green">+1.2 pkg</span></td>
+              </tr>
+              <tr>
+                <td>Lisinopril 10mg</td>
+                <td style="text-align:center;">7.0 pkg</td>
+                <td style="text-align:center;">6.6 pkg</td>
+                <td style="text-align:right;"><span class="status-pill pill-red">-0.4 pkg</span></td>
+              </tr>
+              <tr>
+                <td>Ozempic 0.5mg</td>
+                <td style="text-align:center;">2.0 pkg</td>
+                <td style="text-align:center;">2.0 pkg</td>
+                <td style="text-align:right;"><span class="status-pill pill-gray">balanced</span></td>
+              </tr>
+              <tr>
+                <td>Amlodipine 5mg</td>
+                <td style="text-align:center;">5.6 pkg</td>
+                <td style="text-align:center;">4.7 pkg</td>
+                <td style="text-align:right;"><span class="status-pill pill-red">-0.9 pkg</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Right: Revenue by processor -->
+      <div class="col-12 col-lg-6">
+        <div class="pt-card h-100">
+          <div class="section-heading">Revenue by processor</div>
+
+          {% set bar_colors = ['#2563eb','#16a34a','#dc2626','#d97706','#7c3aed','#0ea5e9','#64748b'] %}
+          {% set max_paid = summary.by_processor | map(attribute='total_paid') | list | max if summary.by_processor else 1 %}
+          {% for p in summary.by_processor %}
+          {% set pct = ((p.total_paid / max_paid) * 100) | round | int if max_paid > 0 else 0 %}
+          <div class="rev-row">
+            <div class="rev-label">{{ p.processor }} <span>${{ "{:,.0f}".format(p.total_paid) }}</span></div>
+            <div class="rev-track"><div class="rev-bar" style="width:{{ pct }}%;background:{{ bar_colors[loop.index0 % bar_colors|length] }};"></div></div>
+          </div>
+          {% else %}
+          <p class="text-muted small">No processor data available.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DOCTORS + INSIGHTS ROW ── -->
+    <div class="row g-3">
+
+      <!-- Left: Top referring doctors -->
+      <div class="col-12 col-lg-6">
+        <div class="pt-card h-100">
+          <div class="section-heading">Top referring doctors</div>
+
+          {% set avatar_colors = ['#0f4c81','#0ea5e9','#7c3aed','#64748b','#16a34a'] %}
+          {% for doc in top_doctors %}
+          <div class="doc-row">
+            <span class="doc-rank">{{ loop.index }}</span>
+            <span class="doc-avatar" style="background:{{ avatar_colors[loop.index0 % avatar_colors|length] }};">{{ doc.initials }}</span>
+            <div class="doc-info">
+              <div class="doc-name">{{ doc.name }}</div>
+              <div class="doc-contact">{{ doc.phone }}{% if doc.city %} &middot; {{ doc.city }}{% endif %}</div>
+            </div>
+            <div class="doc-stats">
+              <div class="doc-rx">{{ doc.rx_count }} Rx</div>
+            </div>
+          </div>
+          {% else %}
+          <p class="text-muted small">No prescriber data found in custom log.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Right: Key insights -->
+      <div class="col-12 col-lg-6">
+        <div class="pt-card h-100">
+          <div class="section-heading">Key insights</div>
+
+          <div class="insight-row">
+            <span class="insight-dot dot-red"></span>
+            <div>
+              <div class="insight-title">Caremark underpaid on 47 prescriptions</div>
+              <div class="insight-sub">Total underpayment: $3,240 &mdash; eligible for dispute</div>
+            </div>
+          </div>
+
+          <div class="insight-row">
+            <span class="insight-dot dot-red"></span>
+            <div>
+              <div class="insight-title">12 drugs billed but never purchased from any vendor</div>
+              <div class="insight-sub">Possible data entry error &mdash; investigate immediately</div>
+            </div>
+          </div>
+
+          <div class="insight-row">
+            <span class="insight-dot dot-amber"></span>
+            <div>
+              <div class="insight-title">89 patients overdue for refills</div>
+              <div class="insight-sub">Estimated recoverable revenue: $12,800</div>
+            </div>
+          </div>
+
+          <div class="insight-row">
+            <span class="insight-dot dot-amber"></span>
+            <div>
+              <div class="insight-title">Dr. Montan volume down 18% vs last month</div>
+              <div class="insight-sub">Consider reaching out to maintain relationship</div>
+            </div>
+          </div>
+
+          <div class="insight-row">
+            <span class="insight-dot dot-green"></span>
+            <div>
+              <div class="insight-title">Net profit up 11% vs last month</div>
+              <div class="insight-sub">Kinray pricing efficiency improved significantly</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="app-footer">
+    &copy; <span id="year"></span> Developed by <strong>Priyanka Gulgari</strong>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    let kinrayOpen = false;
+    function toggleKinray() {
+      kinrayOpen = !kinrayOpen;
+      document.getElementById('kinray-panel')
+        .classList.toggle('open', kinrayOpen);
+      document.getElementById('kinray-card')
+        .classList.toggle('active', kinrayOpen);
+      if (kinrayOpen) {
+        setTimeout(() => {
+          document.querySelectorAll('.breakdown-bar')
+            .forEach(b => b.style.width = b.dataset.w + '%');
+        }, 50);
+      }
+    }
+  </script>
+</body>
+</html>

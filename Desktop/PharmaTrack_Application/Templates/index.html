@@ -5,110 +5,214 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PharmaTrack — Report Runner</title>
 
+  <!-- Google Font: DM Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <!-- Bootstrap 5 + Icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
   <style>
     :root {
-      --brand: #5b8def;     /* soft blue */
-      --brand-2: #6dd3c2;   /* mint */
-      --ink: #222;
-      --muted: #6c757d;
-      --bg: #f6f8fb;
+      --brand: #0f4c81;
+      --brand-light: #1a6bb5;
+      --brand-soft: #e8f2ff;
+      --accent: #00c48c;
+      --bg: #f7f9fc;
+      --border: #e2e8f0;
+      --ink: #1a202c;
+      --muted: #64748b;
     }
+
     body {
-      background: radial-gradient(60rem 60rem at 10% -10%, #eaf2ff 0%, transparent 40%), var(--bg);
-    }
-     body {
-    background: linear-gradient(-45deg, #f3f9ff, #fff7f3, #e8fdf5, #fff0f5);
-    background-size: 400% 400%;
-    animation: gradientShift 15s ease infinite;
-    transition: background-color .3s, color .3s;
-    }
-    @keyframes gradientShift {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      color: var(--ink);
+      transition: background-color .3s, color .3s;
     }
 
     /* 🌙 Dark mode */
-    .dark-mode {
-      background: #121212;
-      color: #eee;
+    .dark-mode { background: #121212; color: #eee; }
+    .dark-mode .step-card { background: #1e1e1e; border-color: #333; color: #ddd; }
+    .dark-mode .pt-navbar { background: #1a1a1a; border-color: #333; }
+
+    /* ── Navbar ── */
+    .pt-navbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 0;
+      position: sticky;
+      top: 0;
+      z-index: 1050;
     }
+    .pt-logo-box {
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: inline-grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .pt-brand-name { font-weight: 600; font-size: 1.05rem; color: var(--ink); line-height: 1.15; }
+    .pt-brand-sub  { font-size: 0.72rem; color: var(--muted); }
+    .pt-support-link { font-size: 0.82rem; color: var(--muted); }
+    .pt-support-link a { color: var(--brand); text-decoration: none; font-weight: 500; }
+    .pt-support-link a:hover { text-decoration: underline; }
+
+    /* ── Step progress indicator ── */
+    .step-progress { display: flex; align-items: center; margin-bottom: 28px; }
+    .sp-item { display: flex; align-items: center; gap: 8px; }
+    .sp-circle {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 2px solid var(--border); background: #fff;
+      display: inline-grid; place-items: center;
+      font-size: 0.8rem; font-weight: 600; color: var(--muted);
+      flex-shrink: 0; transition: 0.2s all;
+    }
+    .sp-circle.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .sp-circle.done   { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .sp-label { font-size: 0.82rem; color: var(--muted); font-weight: 500; white-space: nowrap; }
+    .sp-label.active  { color: var(--brand); font-weight: 600; }
+    .sp-line  { flex: 1; height: 2px; background: var(--border); margin: 0 10px; }
+
+    /* ── Page title ── */
+    .page-title { text-align: center; margin-bottom: 32px; }
+    .page-title h2 { font-size: 1.9rem; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+    .page-title p  { color: var(--muted); font-size: 0.95rem; }
+
+    /* ── Cards ── */
     .step-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(15, 76, 129, 0.06);
+      background: #fff;
       max-height: 80vh;
       overflow-y: auto;
     }
-    .dark-mode .step-card {
-      background: #1e1e1e;
-      border-color: #333;
-      color: #ddd;
+    .brand-gradient { background: var(--brand); color: #fff; }
+    .badge-step {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: inline-grid; place-items: center;
+      background: var(--brand); color: #fff;
     }
-    
-
-
-    /* 💬 Toast color tweak */
-    .toast-success {
-      background-color: #28a745 !important;
-    }
-
-    .brand-gradient { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; }
-    .step-card { border: 1px solid #e9eef7; border-radius: 16px; box-shadow: 0 6px 18px rgba(26, 40, 77, 0.06); }
-    .badge-step { width: 36px; height: 36px; border-radius: 50%; display: inline-grid; place-items: center; }
     .muted { color: var(--muted); }
 
-    /* Upload */
+    /* ── Form controls ── */
+    .form-control:focus, .form-select:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
+    }
+    .form-label { font-weight: 500; font-size: 0.88rem; color: #374151; margin-bottom: 6px; }
+
+    /* ── Dropzones ── */
     .uploader input[type=file] { display: none; }
     .dropzone {
-      border: 2px dashed #cfe0ff; border-radius: 12px; padding: 16px; text-align: center;
-      transition: 0.2s border-color; background: #fbfdff; cursor: pointer;
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 20px 16px;
+      text-align: center;
+      transition: 0.2s all;
+      background: #fafbfd;
+      cursor: pointer;
     }
-    .dropzone.dragover { border-color: var(--brand); background: #f0f6ff; }
+    .dropzone:hover { border-color: var(--brand); background: var(--brand-soft); }
+    .dropzone.dragover { border-color: var(--brand); background: var(--brand-soft); }
+    .dropzone .dz-icon { font-size: 1.6rem; color: var(--brand); margin-bottom: 6px; display: block; }
+    .dropzone .dz-text { font-size: 0.85rem; color: var(--ink); font-weight: 500; display: block; }
+    .dropzone .dz-hint { font-size: 0.75rem; color: var(--muted); display: block; margin-top: 2px; }
+    .dz-badge {
+      display: inline-block;
+      font-size: 0.68rem; font-weight: 600; letter-spacing: 0.03em;
+      padding: 2px 8px; border-radius: 20px; margin-top: 7px;
+    }
+    .dz-badge-required { background: #fee2e2; color: #b91c1c; }
+    .dz-badge-optional  { background: #fef3c7; color: #92400e; }
 
-    .progress-thin .progress-bar { height: 6px; border-radius: 6px; }
-    .footer-note { font-size: .88rem; }
+    /* ── Buttons ── */
+    .btn-primary {
+      background-color: var(--brand) !important;
+      border-color: var(--brand) !important;
+      font-weight: 500;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--brand-light) !important;
+      border-color: var(--brand-light) !important;
+    }
+    .btn-outline-secondary { color: var(--muted); border-color: var(--border); }
+    .btn-outline-secondary:hover { background-color: #f1f5f9; border-color: #c8d6e5; color: var(--ink); }
 
+    /* ── Progress bar (hidden, kept for JS) ── */
+    .progress-thin .progress-bar { height: 6px; border-radius: 6px; background-color: var(--brand) !important; }
+    #progressLabel { display: none; }
+
+    /* ── Toast ── */
+    .toast-success { background-color: #28a745 !important; }
+
+    /* ── Footer ── */
     .app-footer {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    text-align: center;
-    font-size: 13px;
-    color: #6c757d;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 6px 0;
-    border-top: 1px solid #e0e0e0;
-    z-index: 1000;
-}
+      position: fixed; bottom: 0; width: 100%;
+      text-align: center; font-size: 13px; color: #6c757d;
+      background: rgba(255,255,255,0.92); padding: 6px 0;
+      border-top: 1px solid var(--border); z-index: 1000;
+    }
+    .footer-note { font-size: .88rem; }
   </style>
 </head>
 <body>
-  <!-- Header / Greeting -->
-  <header class="brand-gradient py-5 mb-4">
-    <div class="container">
-      <div class="row align-items-center g-4">
-        <div class="col-lg-8">
-          <h1 class="display-6 fw-bold mb-2">Hi! Hope you’re having a wonderful time 🌟</h1>
-          <p class="lead mb-0">Ready when you are — let’s run the report for your pharmacy data.</p>
+  <!-- Navbar -->
+  <nav class="pt-navbar">
+    <div class="container d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <span class="pt-logo-box">Rx</span>
+        <div>
+          <div class="pt-brand-name">PharmaTrack</div>
+          <div class="pt-brand-sub">Pharmacy profit intelligence</div>
         </div>
-        <div class="col-lg-4 text-lg-end">
-          <button id="btnStart" class="btn btn-light btn-lg shadow-sm">
-            <i class="bi bi-play-fill me-2"></i>Let’s run the report
-          </button>
-        </div>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <span class="pt-support-link d-none d-sm-inline">
+          Need help? <a href="mailto:support@pharmatrack.com">support@pharmatrack.com</a>
+        </span>
+        <button id="btnStart" class="btn btn-sm"
+          style="background:var(--brand-soft);color:var(--brand);font-weight:500;border:1px solid #c3d9f5;">
+          <i class="bi bi-arrow-repeat me-1"></i>New Report
+        </button>
       </div>
     </div>
-  </header>
+  </nav>
 
-  <main class="container pb-5">
-    <!-- Progress -->
-    <div class="mb-4">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <span class="fw-medium text-secondary">Progress</span>
-        <span id="progressLabel" class="text-secondary small">Step 1 of 4</span>
+  <main class="container pb-5 pt-4">
+
+    <!-- Step progress indicator -->
+    <div class="step-progress">
+      <div class="sp-item">
+        <span class="sp-circle active" id="spCircle1">1</span>
+        <span class="sp-label active" id="spLabel1">Upload files</span>
       </div>
+      <div class="sp-line"></div>
+      <div class="sp-item">
+        <span class="sp-circle" id="spCircle2">2</span>
+        <span class="sp-label" id="spLabel2">Review summary</span>
+      </div>
+      <div class="sp-line"></div>
+      <div class="sp-item">
+        <span class="sp-circle" id="spCircle3">3</span>
+        <span class="sp-label" id="spLabel3">Download report</span>
+      </div>
+    </div>
+
+    <!-- Page title -->
+    <div class="page-title">
+      <h2>Upload your pharmacy data</h2>
+      <p>We’ll analyze your billing vs purchasing data and show you exactly where you’re losing money</p>
+    </div>
+
+    <!-- Hidden progress elements kept for JS compatibility -->
+    <div style="display:none;">
+      <span id="progressLabel">Step 1 of 4</span>
       <div class="progress progress-thin" style="height:6px;">
         <div id="progressBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
       </div>
@@ -135,18 +239,37 @@
                 <div class="invalid-feedback">Please enter a pharmacy name.</div>
               </div>
               <div class="col-md-6">
-                <label class="form-label">Date Range (e.g., 01-2025 to 09-2025)</label>
-                <input class="form-control" name="date_range" required>
-                <div class="invalid-feedback">Please enter a date range.</div>
+                <label class="form-label">Date Range</label>
+                <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end">
+                  <div>
+                    <label class="form-label" style="font-size:12px">From</label>
+                    <select class="form-control" id="from_month" name="from_month" required onchange="updateDateRange()">
+                      <option value="">Select month</option>
+                    </select>
+                  </div>
+                  <div style="padding-bottom:10px;color:var(--ink-3);text-align:center">→</div>
+                  <div>
+                    <label class="form-label" style="font-size:12px">To</label>
+                    <select class="form-control" id="to_month" name="to_month" required onchange="updateDateRange()">
+                      <option value="">Select month</option>
+                    </select>
+                  </div>
+                </div>
+                <!-- Hidden field that sends formatted date range to Flask -->
+                <input type="hidden" id="date_range" name="date_range" value="">
+                <!-- Summary shown below selectors -->
+                <div id="date_summary" style="font-size:12px;color:var(--ink-3);margin-top:6px;min-height:18px"></div>
+                <div class="invalid-feedback">Please select a date range.</div>
               </div>
 
               <div class="col-md-6">
                 <label class="form-label">BestRx — Custom Log (CSV)</label>
                 <div class="uploader">
                   <label class="dropzone w-100" data-for="custom_log">
-                    <i class="bi bi-filetype-csv fs-4 d-block mb-1"></i>
-                    <span class="d-block">Drag & drop or click to upload</span>
-                    <small class="text-secondary">.csv</small>
+                    <i class="bi bi-filetype-csv dz-icon"></i>
+                    <span class="dz-text">Drag & drop or click to upload</span>
+                    <span class="dz-hint">.csv files only</span>
+                    <span class="dz-badge dz-badge-required">Required</span>
                   </label>
                   <input type="file" id="custom_log" name="custom_log" accept=".csv" required>
                 </div>
@@ -157,9 +280,10 @@
                 <label class="form-label">BestRx — ALL PBM (CSV)</label>
                 <div class="uploader">
                   <label class="dropzone w-100" data-for="all_pbm">
-                    <i class="bi bi-file-earmark-spreadsheet fs-4 d-block mb-1"></i>
-                    <span class="d-block">Drag & drop or click to upload</span>
-                    <small class="text-secondary">.csv</small>
+                    <i class="bi bi-file-earmark-spreadsheet dz-icon"></i>
+                    <span class="dz-text">Drag & drop or click to upload</span>
+                    <span class="dz-hint">.csv files only</span>
+                    <span class="dz-badge dz-badge-optional">Optional</span>
                   </label>
                   <input type="file" id="all_pbm" name="all_pbm" accept=".csv" required>
                 </div>
@@ -170,9 +294,10 @@
                 <label class="form-label">BIN Master (CSV)</label>
                 <div class="uploader">
                   <label class="dropzone w-100" data-for="bin_master">
-                    <i class="bi bi-clipboard-data fs-4 d-block mb-1"></i>
-                    <span class="d-block">Drag & drop or click to upload</span>
-                    <small class="text-secondary">.csv</small>
+                    <i class="bi bi-clipboard-data dz-icon"></i>
+                    <span class="dz-text">Drag & drop or click to upload</span>
+                    <span class="dz-hint">.csv files only</span>
+                    <span class="dz-badge dz-badge-required">Required</span>
                   </label>
                   <input type="file" id="bin_master" name="bin_master" accept=".csv" required>
                 </div>
@@ -183,9 +308,10 @@
                 <label class="form-label">KINRAY (CSV) -> date, ndc, shipped, invoice </label>
                 <div class="uploader">
                   <label class="dropzone w-100" data-for="kinray_file">
-                    <i class="bi bi-filetype-csv fs-4 d-block mb-1"></i>
-                    <span class="d-block">Drag & drop or click to upload</span>
-                    <small class="text-secondary">.csv</small>
+                    <i class="bi bi-filetype-csv dz-icon"></i>
+                    <span class="dz-text">Drag & drop or click to upload</span>
+                    <span class="dz-hint">.csv files only</span>
+                    <span class="dz-badge dz-badge-required">Required</span>
                   </label>
                   <input type="file" id="kinray_file" name="kinray_file" accept=".csv" required>
                 </div>
@@ -895,7 +1021,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       toast?.('Report ready!');
-      showStep?.(2);           // show Step 2 with those buttons
+      if (data.dashboard_url) {
+        window.location.href = data.dashboard_url;
+      } else {
+        showStep?.(2);           // fallback: show Step 2 with download buttons
+      }
 
     } catch (err) {
       alert(`Finalize error: ${err.message || err}`);
@@ -1015,6 +1145,7 @@ function resetWizard() {
 
   // Form + validation
   uploadForm?.reset();
+  _populateMonthSelects();
   uploadForm?.classList.remove('was-validated');
 
   // Fully clear file inputs (replace nodes)
@@ -1049,6 +1180,120 @@ function resetWizard() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+
+const _months = [
+  'January','February','March','April',
+  'May','June','July','August','September',
+  'October','November','December'
+];
+
+function _populateMonthSelects(){
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const years = [
+    currentYear-2,
+    currentYear-1,
+    currentYear,
+    currentYear+1
+  ];
+
+  ['from_month','to_month'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    sel.innerHTML = '<option value="">Select month</option>';
+    years.forEach(yr => {
+      _months.forEach((m, mi) => {
+        const val = `${yr}-${String(mi+1).padStart(2,'0')}`;
+        sel.innerHTML +=
+          `<option value="${val}">${m} ${yr}</option>`;
+      });
+    });
+  });
+
+  // Smart defaults: 13 months ago to last month
+  const defFrom = new Date(
+    now.getFullYear(),
+    now.getMonth()-13, 1
+  );
+  const defTo = new Date(
+    now.getFullYear(),
+    now.getMonth()-1, 1
+  );
+
+  const fromSel = document.getElementById('from_month');
+  const toSel = document.getElementById('to_month');
+
+  if(fromSel) fromSel.value =
+    `${defFrom.getFullYear()}-` +
+    `${String(defFrom.getMonth()+1).padStart(2,'0')}`;
+
+  if(toSel) toSel.value =
+    `${defTo.getFullYear()}-` +
+    `${String(defTo.getMonth()+1).padStart(2,'0')}`;
+
+  updateDateRange();
+}
+
+function updateDateRange(){
+  const fromVal = document.getElementById('from_month')?.value;
+  const toVal = document.getElementById('to_month')?.value;
+  const summary = document.getElementById('date_summary');
+  const hidden = document.getElementById('date_range');
+
+  if(!fromVal || !toVal){
+    if(summary) summary.textContent = '';
+    if(hidden) hidden.value = '';
+    return;
+  }
+
+  const [fy, fm] = fromVal.split('-').map(Number);
+  const [ty, tm] = toVal.split('-').map(Number);
+
+  // Validate end is after start
+  if(ty < fy || (ty===fy && tm<fm)){
+    if(summary){
+      summary.textContent =
+        'End month must be after start month';
+      summary.style.color = '#e53e3e';
+    }
+    if(hidden) hidden.value = '';
+    return;
+  }
+
+  // Calculate months count
+  const numMonths = (ty-fy)*12 + (tm-fm) + 1;
+
+  // Last day of end month
+  const lastDay = new Date(ty, tm, 0).getDate();
+
+  // Human readable labels
+  const fromLabel =
+    `${_months[fm-1]} 1, ${fy}`;
+  const toLabel =
+    `${_months[tm-1]} ${lastDay}, ${ty}`;
+
+  // Update summary text
+  if(summary){
+    summary.style.color = 'var(--ink-3)';
+    summary.textContent =
+      `${fromLabel} → ${toLabel} · ` +
+      `${numMonths} month${numMonths>1?'s':''}`;
+  }
+
+  // Update hidden field sent to Flask
+  // Format: "Dec 2024 - Dec 2025"
+  if(hidden){
+    hidden.value =
+      `${_months[fm-1].substring(0,3)} ${fy}` +
+      ` - ` +
+      `${_months[tm-1].substring(0,3)} ${ty}`;
+  }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+  _populateMonthSelects();
+});
 
 </script>
 <footer class="app-footer">

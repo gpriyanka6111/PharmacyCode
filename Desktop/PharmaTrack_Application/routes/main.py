@@ -221,6 +221,69 @@ def upload_file():
         "Summary"
     ]
 
+    # ---- Insurance Paid Total (from BestRx custom log) ----
+    if 'Ins Paid Total' in log_df.columns:
+        all_pbm_total = pd.to_numeric(
+            log_df['Ins Paid Total'].astype(str)
+            .str.replace(',', '', regex=False)
+            .str.replace('$', '', regex=False)
+            .str.replace(r'[^0-9.\-]', '', regex=True),
+            errors='coerce'
+        ).fillna(0).sum()
+    else:
+        # Fallback: sum winning paid per row
+        all_pbm_total = pd.to_numeric(
+            log_df.get('Winning_Paid',
+            pd.Series([0])), errors='coerce'
+        ).fillna(0).sum()
+
+    # ---- Kinray Total (Real invoices only) ----
+    kinray_raw = pd.read_csv(kinray_path, dtype=str)
+
+    # Remove Kinray subtotal rows
+    # (subtotal rows have blank NDC/UPC)
+    kinray_raw = kinray_raw[
+        kinray_raw['NDC/UPC'].notna() &
+        (kinray_raw['NDC/UPC'].astype(str)
+         .str.strip().ne('')) &
+        (kinray_raw['NDC/UPC'].astype(str)
+         .str.strip().ne('nan'))
+    ].copy()
+
+    # Clean Invoice $ column
+    kinray_raw['__price__'] = pd.to_numeric(
+        kinray_raw['Invoice $'].astype(str)
+        .str.replace(',', '', regex=False)
+        .str.replace('$', '', regex=False)
+        .str.replace(r'[^0-9.\-]', '', regex=True),
+        errors='coerce'
+    ).fillna(0)
+
+    total_kinray = float(kinray_raw['__price__'].sum())
+    kinray_rows = len(kinray_raw)
+    kinray_ndcs = int(
+        kinray_raw['NDC/UPC'].nunique()
+    )
+
+    # Breakdown by Type
+    kinray_by_type = []
+    if 'Type' in kinray_raw.columns:
+        type_grp = (
+            kinray_raw.groupby('Type')['__price__']
+            .sum()
+            .sort_values(ascending=False)
+            .reset_index()
+        )
+        kinray_by_type = [
+            {
+                'type': str(r['Type']),
+                'total': float(r['__price__'])
+            }
+            for _, r in type_grp.iterrows()
+            if r['__price__'] > 0
+            and str(r['Type']).strip() not in ('', 'nan', 'Type')
+        ]
+
     summary = {
         "total_rx": int(log_df.shape[0]),
         "processors": sorted(log_df["Processor"].dropna().astype(str).str.strip().unique().tolist()),
@@ -234,7 +297,12 @@ def upload_file():
         "unmapped_bins": unmapped_bins,                # [{bin, rx_count}, ...]
         "unmapped_total_bins": unmapped_total_bins,    # e.g., 7
         "unmapped_total_rx": unmapped_total_rx,        # e.g., 128
-        "note_unmapped": "Update the BIN Master file to map these BINs to processors."
+        "note_unmapped": "Update the BIN Master file to map these BINs to processors.",
+        "all_pbm_total": float(all_pbm_total),
+        "total_kinray": total_kinray,
+        "kinray_rows": kinray_rows,
+        "kinray_ndcs": kinray_ndcs,
+        "kinray_by_type": kinray_by_type,
 
     }
 
@@ -494,7 +562,8 @@ def finalize_job():
             "ok": True,
             "main_filename": main_name,
             "main_download_url": f"/download?filename={quote(main_name)}",
-            "download_url": f"/download?filename={quote(main_name)}"  # backwards-compatible
+            "download_url": f"/download?filename={quote(main_name)}",  # backwards-compatible
+            "dashboard_url": f"/dashboard?job_id={job_id}"
         }
         if audit_name and ctx.get("outfile_audit"):
             resp.update({
@@ -506,6 +575,49 @@ def finalize_job():
 
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@bp.route('/dashboard')
+def dashboard():
+    job_id = request.args.get('job_id', '')
+    ctx = _JOB_CACHE.get(job_id)
+    if not ctx:
+        return redirect('/')
+
+    log_df = pd.read_csv(ctx['paths']['custom_log'], dtype=str)
+
+    top_doctors = []
+    if 'Prescriber Name' in log_df.columns:
+        doc_grp = (log_df.groupby('Prescriber Name', as_index=False)
+                   .agg(rx_count=('Rx #', 'count')))
+        doc_grp = doc_grp.sort_values('rx_count', ascending=False).head(5)
+        for _, row in doc_grp.iterrows():
+            name = str(row['Prescriber Name']).strip()
+            initials = ''.join([p[0] for p in name.split()[:2]]).upper()
+            phone = ''
+            city = ''
+            mask = log_df['Prescriber Name'] == row['Prescriber Name']
+            if 'Prescriber Phone #' in log_df.columns:
+                phone = log_df.loc[mask, 'Prescriber Phone #'].iloc[0]
+            if 'Prescriber City' in log_df.columns:
+                city = log_df.loc[mask, 'Prescriber City'].iloc[0]
+            top_doctors.append({
+                'name': name,
+                'initials': initials,
+                'phone': str(phone).strip(),
+                'city': str(city).strip(),
+                'rx_count': int(row['rx_count'])
+            })
+
+    summary = ctx.get('summary', {})
+
+    return render_template('dashboard.html',
+        pharmacy_name=ctx.get('pharmacy_name', 'Pharmacy'),
+        date_range=ctx.get('date_range', ''),
+        summary=summary,
+        top_doctors=top_doctors,
+        job_id=job_id
+    )
 
 
 @bp.route('/pick_folder', methods=['GET'])
