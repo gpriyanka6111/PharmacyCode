@@ -192,7 +192,7 @@ def add_missed_refill_revenue_sheet(
         ins1 = pd.to_numeric(df.get('Ins Paid Plan 1', 0), errors='coerce').fillna(0)
         ins2 = pd.to_numeric(df.get('Ins Paid Plan 2', 0), errors='coerce').fillna(0)
         copay = pd.to_numeric(df.get('Copay', df.get('COPAY', 0)), errors='coerce').fillna(0)
-        sdra = pd.to_numeric(df.get('* SDRA Amt', df.get('SDRA Amt', 0)), errors='coerce').fillna(0)
+        sdra = pd.to_numeric(df.get('* SDRA Amt', df.get('SDRA Amt', df.get('SDRA', 0))), errors='coerce').fillna(0)
         df['__TotalCollected__'] = np.maximum(ins1, ins2) + copay + sdra
 
     patient_col = pick_col(['Patient Name'])

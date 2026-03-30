@@ -175,6 +175,14 @@
     .rev-label span { color: var(--muted); font-weight: 400; }
     .rev-track { background: #f1f5f9; border-radius: 6px; height: 8px; overflow: hidden; }
     .rev-bar   { height: 100%; border-radius: 6px; }
+    .proc-row { margin-bottom: 10px; display: grid; grid-template-columns: 110px 1fr 45px 70px; align-items: center; gap: 8px; }
+    .proc-row:last-child { margin-bottom: 0; }
+    .proc-name { font-size: 0.82rem; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .proc-bar-wrap { background: #f1f5f9; border-radius: 6px; height: 8px; overflow: hidden; }
+    .proc-bar  { height: 100%; border-radius: 6px; }
+    .proc-pct  { font-size: 12px; color: var(--color-text-secondary, var(--muted)); text-align: right; }
+    .proc-val  { font-size: 0.82rem; color: var(--muted); text-align: right; }
+    .cash-badge { font-size: 10px; background: #EAF3DE; color: #3B6D11; padding: 1px 6px; border-radius: 10px; margin-left: 4px; }
 
     /* ── Doctor list ── */
     .doc-row {
@@ -315,6 +323,19 @@
       font-weight: 500;
       padding-top: 8px;
     }
+    #panel-donotorder.open { max-height: 700px; }
+    .panel-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; font-weight: 500; }
+    .panel-actions { display: flex; align-items: center; gap: 8px; }
+    .search-input { font-size: 13px; padding: 5px 10px; border: 1px solid var(--color-border-tertiary); border-radius: 6px; outline: none; width: 180px; }
+    .export-btn { font-size: 12px; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+    .btn-ghost { font-size: 12px; color: var(--color-text-secondary); background: none; border: 1px solid var(--color-border-tertiary); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+    .btn-primary-sm { font-size: 12px; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+    .scroll-body { overflow-y: auto; max-height: 480px; }
+    .panel-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .panel-table th { position: sticky; top: 0; background: var(--color-background-secondary); padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--color-border-tertiary); white-space: nowrap; }
+    .panel-table td { padding: 7px 12px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+    .panel-table tr:last-child td { border-bottom: none; }
+    .panel-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; border-top: 0.5px solid var(--color-border-tertiary); font-size: 12px; color: var(--color-text-secondary); background: var(--color-background-secondary); }
   </style>
 </head>
 <body>
@@ -409,18 +430,27 @@
         <div class="breakdown-row">
           <span class="breakdown-label">
             {{ item.type }}
+            {% if item.total < 0 %}
+            <span style="font-size:10px;background:#FCEBEB;color:#A32D2D;padding:1px 6px;border-radius:10px;margin-left:4px">rebate</span>
+            {% endif %}
           </span>
           <div class="breakdown-bar-wrap">
             <div class="breakdown-bar"
-                 data-w="{{ ((item.total/total_k)*100)|round(1) }}"
+                 data-w="{{ [((item.total|abs/total_k)*100), 0]|max|round(1) }}"
                  style="width:0%;background:#185FA5">
             </div>
           </div>
+          {% if item.total < 0 %}
+          <span class="breakdown-value" style="color:#A32D2D">
+            -${{ '{:,.2f}'.format(item.total|abs) }}
+          </span>
+          {% else %}
           <span class="breakdown-value">
             ${{ '{:,.2f}'.format(item.total) }}
           </span>
+          {% endif %}
           <span class="breakdown-pct">
-            {{ ((item.total/total_k)*100)|round(1) }}%
+            {% if item.total < 0 %}-{% endif %}{{ ((item.total|abs/total_k)*100)|round(1) }}%
           </span>
         </div>
         {% endfor %}
@@ -453,8 +483,8 @@
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="alert-card green h-100">
-          <div class="alert-num">56</div>
+        <div class="alert-card green h-100" onclick="togglePanel('donotorder')" style="cursor:pointer">
+          <div class="alert-num">{{ excel_data.do_not_order.count | default(0) }}</div>
           <div class="alert-title">Drugs overstocked</div>
           <div class="alert-sub">Do not order these items</div>
           <div class="alert-link">View do-not-order list</div>
@@ -466,6 +496,39 @@
           <div class="alert-title">Rx comparisons analyzed</div>
           <div class="alert-sub">47 underpayments detected</div>
           <div class="alert-link">View full comparison</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    const EXCEL_DATA = {{ excel_data | tojson }};
+    const JOB_ID = '{{ job_id }}';
+    </script>
+
+    <div class="panel" id="panel-donotorder">
+      <div class="panel-header">
+        <div class="panel-title">
+          Drugs overstocked — do not order
+          <span class="panel-badge" style="background:#EAF3DE;color:#3B6D11">
+            {{ excel_data.do_not_order.count | default(0) }} drugs
+          </span>
+        </div>
+        <div class="panel-actions">
+          <input class="search-input" id="search-donotorder" placeholder="Search drug name..." oninput="filterDNO()"/>
+          <button class="export-btn" style="background:#639922" onclick="exportDNO()">Export list</button>
+          <button class="btn-ghost" onclick="togglePanel('donotorder')">Close</button>
+        </div>
+      </div>
+      <div class="scroll-body">
+        <table class="panel-table" id="table-donotorder">
+          <thead id="thead-donotorder"></thead>
+          <tbody id="tbody-donotorder"></tbody>
+        </table>
+      </div>
+      <div class="panel-footer">
+        <div>Showing <span id="showing-dno">0</span> of <span id="total-dno">0</span> drugs</div>
+        <div>
+          <button class="btn-primary-sm" id="loadmore-dno" onclick="loadMoreDNO()" style="display:none;background:#639922">Load more</button>
         </div>
       </div>
     </div>
@@ -527,13 +590,24 @@
         <div class="pt-card h-100">
           <div class="section-heading">Revenue by processor</div>
 
-          {% set bar_colors = ['#2563eb','#16a34a','#dc2626','#d97706','#7c3aed','#0ea5e9','#64748b'] %}
-          {% set max_paid = summary.by_processor | map(attribute='total_paid') | list | max if summary.by_processor else 1 %}
+          {% set total_rev = namespace(value=0) %}
           {% for p in summary.by_processor %}
-          {% set pct = ((p.total_paid / max_paid) * 100) | round | int if max_paid > 0 else 0 %}
-          <div class="rev-row">
-            <div class="rev-label">{{ p.processor }} <span>${{ "{:,.0f}".format(p.total_paid) }}</span></div>
-            <div class="rev-track"><div class="rev-bar" style="width:{{ pct }}%;background:{{ bar_colors[loop.index0 % bar_colors|length] }};"></div></div>
+            {% set total_rev.value = total_rev.value + p.total_paid %}
+          {% endfor %}
+          {% for p in summary.by_processor %}
+          {% set pct = ((p.total_paid / total_rev.value) * 100) if total_rev.value > 0 else 0 %}
+          <div class="proc-row">
+            <span class="proc-name">
+              {{ p.processor }}
+              {% if p.processor == 'CASH' %}<span class="cash-badge">cash</span>{% endif %}
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar"
+                   style="width:{{ [pct,0]|max|round(1) }}%;background:{% if p.processor == 'CASH' %}#639922{% else %}#185FA5{% endif %};">
+              </div>
+            </div>
+            <span class="proc-pct">{{ pct|round(1) }}%</span>
+            <span class="proc-val">${{ '{:,.0f}'.format(p.total_paid) }}</span>
           </div>
           {% else %}
           <p class="text-muted small">No processor data available.</p>
@@ -547,25 +621,99 @@
 
       <!-- Left: Top referring doctors -->
       <div class="col-12 col-lg-6">
-        <div class="pt-card h-100">
-          <div class="section-heading">Top referring doctors</div>
+        <div class="card" id="doctor-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:0.5px solid var(--color-border-tertiary)">
+            <span class="card-title">Top referring doctors</span>
+            <button id="docExpandBtn" onclick="toggleDoctorList()" style="font-size:12px;color:#185FA5;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px">
+              ▾ Show all {{ top_doctors|length }} doctors
+            </button>
+          </div>
 
-          {% set avatar_colors = ['#0f4c81','#0ea5e9','#7c3aed','#64748b','#16a34a'] %}
+          {% set max_rx = top_doctors[0].rx_count if top_doctors else 1 %}
+
           {% for doc in top_doctors %}
-          <div class="doc-row">
-            <span class="doc-rank">{{ loop.index }}</span>
-            <span class="doc-avatar" style="background:{{ avatar_colors[loop.index0 % avatar_colors|length] }};">{{ doc.initials }}</span>
-            <div class="doc-info">
-              <div class="doc-name">{{ doc.name }}</div>
-              <div class="doc-contact">{{ doc.phone }}{% if doc.city %} &middot; {{ doc.city }}{% endif %}</div>
+          {% set bar_w = ((doc.rx_count / max_rx) * 100)|round(1) %}
+          <div class="doc-row" id="doc-row-{{ loop.index0 }}"
+               {% if loop.index > 5 %}
+               style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true"
+               {% else %}
+               style="border-bottom:0.5px solid var(--color-border-tertiary)"
+               {% endif %}>
+
+            <div onclick="toggleDoc({{ loop.index0 }})"
+                 style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s"
+                 onmouseover="this.style.background='var(--color-background-secondary)'"
+                 onmouseout="this.style.background='transparent'">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">{{ loop.index }}</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                {{ doc.initials }}
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  {{ doc.name }}
+                  {% if doc.locations > 1 %}
+                  <span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:10px;margin-left:4px">{{ doc.locations }} locations</span>
+                  {% endif %}
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">{{ doc.phone }} · {{ doc.city }}, {{ doc.state }}</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:{{ bar_w }}%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">{{ doc.rx_count }} Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">{{ doc.pct }}% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">{{ doc.ins_rx }} ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">{{ doc.cash_rx }} cash</span>
+                </div>
+              </div>
+              <span id="arrow-{{ loop.index0 }}" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
             </div>
-            <div class="doc-stats">
-              <div class="doc-rx">{{ doc.rx_count }} Rx</div>
+
+            <div id="detail-{{ loop.index0 }}" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 {{ doc.phone }}<br>
+                    📠 {{ doc.fax }}
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    {{ doc.address }}<br>
+                    {{ doc.city }}, {{ doc.state }} {{ doc.zip }}
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">{{ doc.npi }}</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>{{ doc.ins_rx }} Rx</strong><br>
+                    Cash: <strong>{{ doc.cash_rx }} Rx</strong><br>
+                    Total: <strong>{{ doc.rx_count }} Rx ({{ doc.pct }}%)</strong>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           {% else %}
-          <p class="text-muted small">No prescriber data found in custom log.</p>
+          <p class="text-muted small" style="padding:16px 20px">No prescriber data found in custom log.</p>
           {% endfor %}
+
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;background:var(--color-background-secondary);font-size:12px;color:var(--color-text-secondary);border-top:0.5px solid var(--color-border-tertiary)">
+            <span>Showing top <span id="showingCount">5</span> of {{ top_doctors|length }} doctors</span>
+            <span>
+              {% set total_top = namespace(value=0) %}
+              {% for doc in top_doctors[:5] %}{% set total_top.value = total_top.value + doc.rx_count %}{% endfor %}
+              Top 5: {{ total_top.value }} Rx
+            </span>
+          </div>
         </div>
       </div>
 
@@ -626,6 +774,121 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     document.getElementById("year").textContent = new Date().getFullYear();
+
+    let allDocsVisible = false;
+
+    function toggleDoctorList() {
+      allDocsVisible = !allDocsVisible;
+      document.querySelectorAll('[data-extra="true"]').forEach(el => {
+        el.style.display = allDocsVisible ? 'block' : 'none';
+      });
+      const btn = document.getElementById('docExpandBtn');
+      const count = document.getElementById('showingCount');
+      if (allDocsVisible) {
+        btn.textContent = '▴ Show less';
+        count.textContent = document.querySelectorAll('.doc-row').length;
+      } else {
+        btn.textContent = '▾ Show all doctors';
+        count.textContent = '5';
+      }
+    }
+
+    function toggleDoc(idx) {
+      const detail = document.getElementById('detail-' + idx);
+      const arrow = document.getElementById('arrow-' + idx);
+      const isOpen = detail.style.maxHeight && detail.style.maxHeight !== '0px' && detail.style.maxHeight !== '';
+      if (isOpen) {
+        detail.style.maxHeight = '0';
+        detail.style.opacity = '0';
+        arrow.style.transform = 'rotate(0deg)';
+      } else {
+        detail.style.maxHeight = '300px';
+        detail.style.opacity = '1';
+        arrow.style.transform = 'rotate(180deg)';
+      }
+    }
+
+    let dnoPage = 1;
+    let dnoAllRows = [];
+    let dnoColumns = [];
+
+    function togglePanel(id) {
+      const panel = document.getElementById('panel-' + id);
+      const isOpen = panel.classList.contains('open');
+      panel.classList.toggle('open', !isOpen);
+      if (!isOpen && id === 'donotorder') {
+        loadDNOData();
+      }
+    }
+
+    function loadDNOData() {
+      const data = EXCEL_DATA['do_not_order'];
+      if (!data || data.count === 0) {
+        document.getElementById('tbody-donotorder').innerHTML =
+          '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--color-text-secondary)">No data found</td></tr>';
+        return;
+      }
+      dnoColumns = data.columns;
+      dnoAllRows = data.rows;
+      document.getElementById('thead-donotorder').innerHTML =
+        '<tr>' + dnoColumns.map(c => `<th>${c}</th>`).join('') + '</tr>';
+      renderDNO(dnoAllRows.slice(0, 50));
+      document.getElementById('showing-dno').textContent = Math.min(50, dnoAllRows.length);
+      document.getElementById('total-dno').textContent = data.count;
+      if (data.count > 50) {
+        document.getElementById('loadmore-dno').style.display = 'block';
+      }
+    }
+
+    function renderDNO(rows) {
+      document.getElementById('tbody-donotorder').innerHTML =
+        rows.map(row => '<tr>' + row.map(cell => `<td>${cell}</td>`).join('') + '</tr>').join('');
+    }
+
+    function filterDNO() {
+      const search = document.getElementById('search-donotorder').value.toLowerCase();
+      const filtered = search
+        ? dnoAllRows.filter(row => row.some(cell => String(cell).toLowerCase().includes(search)))
+        : dnoAllRows;
+      renderDNO(filtered.slice(0, 50));
+      document.getElementById('showing-dno').textContent = Math.min(50, filtered.length);
+      document.getElementById('total-dno').textContent = filtered.length;
+    }
+
+    async function loadMoreDNO() {
+      dnoPage++;
+      try {
+        const res = await fetch(`/api/sheet_data?job_id=${JOB_ID}&sheet=do_not_order&page=${dnoPage}`);
+        const data = await res.json();
+        if (data.ok) {
+          const tbody = document.getElementById('tbody-donotorder');
+          data.rows.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = row.map(cell => `<td>${cell}</td>`).join('');
+            tbody.appendChild(tr);
+          });
+          const showing = document.getElementById('showing-dno');
+          showing.textContent = parseInt(showing.textContent) + data.rows.length;
+          if (!data.has_more) document.getElementById('loadmore-dno').style.display = 'none';
+        }
+      } catch(e) { console.error(e); }
+    }
+
+    function exportDNO() {
+      if (!dnoAllRows.length) return;
+      const headers = dnoColumns.join(',');
+      const rows = dnoAllRows.map(r =>
+        r.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')
+      ).join('\n');
+      const csv = headers + '\n' + rows;
+      const blob = new Blob([csv], {type: 'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'do_not_order.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
 
     let kinrayOpen = false;
     function toggleKinray() {

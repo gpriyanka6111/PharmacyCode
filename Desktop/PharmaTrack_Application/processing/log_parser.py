@@ -32,7 +32,7 @@ def _filter_custom_log_transmitted_paid_ins(df):
             status_col = col_lookup[key]
             break
 
-    allowed = {'transmitted', 'paidins'}
+    allowed = {'transmitted', 'paidins', 'paidcash'}
 
     # If no direct status column match, infer by values.
     if status_col is None:

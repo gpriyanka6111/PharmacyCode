@@ -47,6 +47,8 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
     # Normalize SDRA naming to one canonical column
     if '* SDRA Amt' in log_df.columns and 'SDRA Amt' not in log_df.columns:
         log_df.rename(columns={'* SDRA Amt': 'SDRA Amt'}, inplace=True)
+    elif 'SDRA' in log_df.columns and 'SDRA Amt' not in log_df.columns:
+        log_df.rename(columns={'SDRA': 'SDRA Amt'}, inplace=True)
 
     # Normalize Copay naming/case to one canonical column
     if 'Copay' in log_df.columns and 'COPAY' not in log_df.columns:

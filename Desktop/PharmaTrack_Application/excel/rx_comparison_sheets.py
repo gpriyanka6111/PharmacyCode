@@ -29,6 +29,8 @@ def add_rx_unit_compare_sheet_exact(
     #print(df.head())
     if '* SDRA Amt' in df.columns and 'SDRA Amt' not in df.columns:
         df.rename(columns={'* SDRA Amt': 'SDRA Amt'}, inplace=True)
+    elif 'SDRA' in df.columns and 'SDRA Amt' not in df.columns:
+        df.rename(columns={'SDRA': 'SDRA Amt'}, inplace=True)
     if 'Copay' in df.columns and 'COPAY' not in df.columns:
         df.rename(columns={'Copay': 'COPAY'}, inplace=True)
 
@@ -282,6 +284,8 @@ def add_rx_unit_compare_sheet_exact_pos(
     # print(df.head())
     if '* SDRA Amt' in df.columns and 'SDRA Amt' not in df.columns:
         df.rename(columns={'* SDRA Amt': 'SDRA Amt'}, inplace=True)
+    elif 'SDRA' in df.columns and 'SDRA Amt' not in df.columns:
+        df.rename(columns={'SDRA': 'SDRA Amt'}, inplace=True)
     if 'Copay' in df.columns and 'COPAY' not in df.columns:
         df.rename(columns={'Copay': 'COPAY'}, inplace=True)
 

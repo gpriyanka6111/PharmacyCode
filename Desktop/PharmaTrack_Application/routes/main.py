@@ -106,35 +106,43 @@ def upload_file():
     log_df = pd.read_csv(custom_log_path, dtype=str)
     log_df, _status_col, _kept_rows, _dropped_rows = _filter_custom_log_transmitted_paid_ins(log_df)
     bin_df = pd.read_csv(bin_master_path, dtype=str)
-    # ✅ Add this right here
-    for c in ['Ins Paid Plan 1', 'Ins Paid Plan 2', 'Plan 1 BIN', 'Plan 2 BIN']:
-        if c not in log_df.columns:
-            log_df[c] = 0 if 'Paid' in c else ''  # safe default
+    # Normalize BIN columns
+    for col in ['Plan 1 BIN', 'Plan 2 BIN']:
+        if col in log_df.columns:
+            log_df[col] = (log_df[col].astype(str)
+                .str.replace(r'\D', '', regex=True)
+                .str.zfill(6))
 
-    # normalize for summary
-    for c in ['Ins Paid Plan 1', 'Ins Paid Plan 2']:
-        if c in log_df.columns:
-            log_df[c] = pd.to_numeric(log_df[c], errors='coerce').fillna(0)
+    # Normalize payment columns
+    for col in ['Ins Paid Plan 1', 'Ins Paid Plan 2']:
+        if col in log_df.columns:
+            log_df[col] = pd.to_numeric(
+                log_df[col], errors='coerce'
+            ).fillna(0)
 
-    # choose winning bin/paid per row
-    log_df['Winning_BIN'] = np.where(log_df.get('Ins Paid Plan 1', 0) >= log_df.get('Ins Paid Plan 2', 0),
-                                     log_df.get('Plan 1 BIN', ''), log_df.get('Plan 2 BIN', ''))
-    log_df['Winning_BIN'] = log_df['Winning_BIN'].astype(
-        str).str.replace(r'\D', '', regex=True).str.zfill(6)
+    # Choose winning BIN and paid per row
+    log_df['Winning_BIN'] = log_df.apply(
+        lambda r: r['Plan 1 BIN']
+        if r['Ins Paid Plan 1'] >= r['Ins Paid Plan 2']
+        else r['Plan 2 BIN'], axis=1
+    ).str.zfill(6)
+
     log_df['Winning_Paid'] = np.where(
-        log_df['Winning_BIN'] == log_df.get('Plan 1 BIN', ''),
-        log_df.get('Ins Paid Plan 1', 0),
-        log_df.get('Ins Paid Plan 2', 0)
+        log_df['Winning_BIN'] == log_df['Plan 1 BIN'],
+        log_df['Ins Paid Plan 1'],
+        log_df['Ins Paid Plan 2']
     )
-    log_df['Winning_Group'] = np.where(log_df.get('Ins Paid Plan 1', 0) >= log_df.get('Ins Paid Plan 2', 0),
-                                       log_df.get('Plan 1 Group #', ''), log_df.get('Plan 2 Group #', ''))
-    log_df['Winning_PCN'] = np.where(log_df.get('Ins Paid Plan 1', 0) >= log_df.get('Ins Paid Plan 2', 0),
-                                     log_df.get('Plan 1 PCN', ''), log_df.get('Plan 2 PCN', ''))
-    # map BIN -> Processor
-    bin_df['BIN'] = bin_df['BIN'].astype(str).str.replace(
-        r'\D', '', regex=True).str.zfill(6)
-    bin_df['Processor'] = bin_df['Processor'].astype(str).str.strip()
-    bin_to_proc = dict(zip(bin_df['BIN'], bin_df['Processor']))
+
+    # Map BIN to Processor
+    bin_df['BIN'] = (bin_df['BIN'].astype(str)
+        .str.replace(r'\D', '', regex=True)
+        .str.zfill(6))
+    bin_df['Processor'] = (bin_df['Processor']
+        .astype(str).str.strip())
+    bin_to_proc = dict(zip(
+        bin_df['BIN'], bin_df['Processor']
+    ))
+
     log_df['Processor'] = log_df['Winning_BIN'].map(bin_to_proc)
 
     # ---- Unmapped BINs (Winning BINs with no Processor mapping) ----
@@ -176,23 +184,58 @@ def upload_file():
     else:
         total_rx = len(log_df)
 
-    grp = (log_df.dropna(subset=['Processor'])
-                 .groupby('Processor', as_index=False)
-                 .agg(rx_count=('Winning_BIN', 'count'),
-                      total_paid=('Winning_Paid', 'sum')))
-    grp = grp.sort_values('total_paid', ascending=False)
+    # Insurance only rows
+    ins_df = log_df[
+        log_df['Rx Status'].astype(str)
+        .str.strip().str.lower()
+        .str.replace(r'[^a-z]', '', regex=True)
+        .isin(['paidins', 'transmitted'])
+    ].copy()
 
-    # ✅ Insert here
-    if grp.empty:
-        by_processor = []
-        processors = []
-    else:
-        by_processor = [
-            {"processor": r['Processor'], "rx_count": int(
-                r['rx_count']), "total_paid": float(r['total_paid'])}
-            for _, r in grp.iterrows()
-        ]
-        processors = [bp['processor'] for bp in by_processor]
+    # Group by processor
+    grp = (ins_df
+        .dropna(subset=['Processor'])
+        .groupby('Processor', as_index=False)
+        .agg(
+            rx_count=('Winning_BIN', 'count'),
+            total_paid=('Winning_Paid', 'sum')
+        )
+        .sort_values('total_paid', ascending=False)
+    )
+
+    processors = grp['Processor'].tolist()
+    by_processor = [
+        {
+            'processor': str(r['Processor']),
+            'rx_count': int(r['rx_count']),
+            'total_paid': float(r['total_paid'])
+        }
+        for _, r in grp.iterrows()
+    ]
+
+    # Add CASH separately
+    cash_df = log_df[
+        log_df['Rx Status'].astype(str)
+        .str.strip().str.lower()
+        .str.replace(r'[^a-z]', '', regex=True)
+        == 'paidcash'
+    ].copy()
+
+    if len(cash_df) > 0 and 'Total' in cash_df.columns:
+        cash_df['__total__'] = pd.to_numeric(
+            cash_df['Total'].astype(str)
+            .str.replace(',', '', regex=False)
+            .str.replace('$', '', regex=False)
+            .str.replace(r'[^0-9.\-]', '', regex=True),
+            errors='coerce'
+        ).fillna(0)
+
+        by_processor.append({
+            'processor': 'CASH',
+            'rx_count': int(len(cash_df)),
+            'total_paid': float(cash_df['__total__'].sum())
+        })
+        processors.append('CASH')
 
     # ✅ expose sheet choices for the modal
     sheets_available = [
@@ -240,36 +283,42 @@ def upload_file():
     # ---- Kinray Total (Real invoices only) ----
     kinray_raw = pd.read_csv(kinray_path, dtype=str)
 
-    # Remove Kinray subtotal rows
-    # (subtotal rows have blank NDC/UPC)
-    kinray_raw = kinray_raw[
-        kinray_raw['NDC/UPC'].notna() &
-        (kinray_raw['NDC/UPC'].astype(str)
+    # Remove subtotal/header rows — keep only rows with a valid Invoice Number
+    kinray_clean = kinray_raw[
+        kinray_raw['Invoice Number'].notna() &
+        (kinray_raw['Invoice Number'].astype(str)
          .str.strip().ne('')) &
-        (kinray_raw['NDC/UPC'].astype(str)
-         .str.strip().ne('nan'))
+        (kinray_raw['Invoice Number'].astype(str)
+         .str.strip().ne('nan')) &
+        (kinray_raw['Invoice Number'].astype(str)
+         .str.strip().ne('Invoice Number'))
     ].copy()
 
-    # Clean Invoice $ column
-    kinray_raw['__price__'] = pd.to_numeric(
-        kinray_raw['Invoice $'].astype(str)
-        .str.replace(',', '', regex=False)
-        .str.replace('$', '', regex=False)
-        .str.replace(r'[^0-9.\-]', '', regex=True),
-        errors='coerce'
-    ).fillna(0)
+    # Clean Invoice $ column (parentheses = negative, e.g. ($5,877.29) → -5877.29)
+    kinray_clean['__price__'] = pd.to_numeric(
+    kinray_clean['Invoice $'].astype(str)
+    .str.replace(',', '', regex=False)
+    .str.replace('$', '', regex=False)
+    .str.replace('(', '-', regex=False)
+    .str.replace(')', '', regex=False)
+    .str.replace(r'[^0-9.\-]', '', regex=True),
+    errors='coerce'
+).fillna(0)
 
-    total_kinray = float(kinray_raw['__price__'].sum())
-    kinray_rows = len(kinray_raw)
+    total_kinray = float(kinray_clean['__price__'].sum())
+    print(f'[DEBUG] Kinray clean rows: {len(kinray_clean)}')
+    print(f'[DEBUG] Kinray total: {total_kinray}')
+    print(f'[DEBUG] Service total: {kinray_clean[kinray_clean["Type"] == "Service"]["__price__"].sum()}')
+    kinray_rows = len(kinray_clean)
     kinray_ndcs = int(
-        kinray_raw['NDC/UPC'].nunique()
+        kinray_clean['NDC/UPC'].nunique()
     )
 
     # Breakdown by Type
     kinray_by_type = []
-    if 'Type' in kinray_raw.columns:
+    if 'Type' in kinray_clean.columns:
         type_grp = (
-            kinray_raw.groupby('Type')['__price__']
+            kinray_clean.groupby('Type')['__price__']
             .sum()
             .sort_values(ascending=False)
             .reset_index()
@@ -280,20 +329,13 @@ def upload_file():
                 'total': float(r['__price__'])
             }
             for _, r in type_grp.iterrows()
-            if r['__price__'] > 0
-            and str(r['Type']).strip() not in ('', 'nan', 'Type')
+            if str(r['Type']).strip() not in ('', 'nan', 'Type')
         ]
 
     summary = {
         "total_rx": int(log_df.shape[0]),
-        "processors": sorted(log_df["Processor"].dropna().astype(str).str.strip().unique().tolist()),
-        "by_processor": (
-            log_df.groupby("Processor", dropna=True)
-            .agg(rx_count=("Rx #", "count"), total_paid=("Winning_Paid", "sum"))
-            .reset_index()
-            .rename(columns={"Processor": "processor"})
-            .to_dict(orient="records")
-        ),
+        "processors": processors,
+        "by_processor": by_processor,
         "unmapped_bins": unmapped_bins,                # [{bin, rx_count}, ...]
         "unmapped_total_bins": unmapped_total_bins,    # e.g., 7
         "unmapped_total_rx": unmapped_total_rx,        # e.g., 128
@@ -303,7 +345,8 @@ def upload_file():
         "kinray_rows": kinray_rows,
         "kinray_ndcs": kinray_ndcs,
         "kinray_by_type": kinray_by_type,
-
+        "cash_rx_count": int(len(cash_df)) if len(cash_df) > 0 else 0,
+        "cash_rx_total": float(cash_df['__total__'].sum()) if len(cash_df) > 0 and '__total__' in cash_df.columns else 0.0,
     }
 
     # cache minimal job context for finalize
@@ -585,39 +628,144 @@ def dashboard():
         return redirect('/')
 
     log_df = pd.read_csv(ctx['paths']['custom_log'], dtype=str)
+    total_rx = len(log_df)
 
     top_doctors = []
-    if 'Prescriber Name' in log_df.columns:
-        doc_grp = (log_df.groupby('Prescriber Name', as_index=False)
-                   .agg(rx_count=('Rx #', 'count')))
-        doc_grp = doc_grp.sort_values('rx_count', ascending=False).head(5)
-        for _, row in doc_grp.iterrows():
-            name = str(row['Prescriber Name']).strip()
-            initials = ''.join([p[0] for p in name.split()[:2]]).upper()
-            phone = ''
-            city = ''
-            mask = log_df['Prescriber Name'] == row['Prescriber Name']
-            if 'Prescriber Phone #' in log_df.columns:
-                phone = log_df.loc[mask, 'Prescriber Phone #'].iloc[0]
-            if 'Prescriber City' in log_df.columns:
-                city = log_df.loc[mask, 'Prescriber City'].iloc[0]
+    if 'Prescriber NPI #' in log_df.columns:
+
+        def most_common(x):
+            return x.value_counts().index[0] if len(x) > 0 else ''
+
+        npi_grp = (
+            log_df.groupby('Prescriber NPI #', as_index=False)
+            .agg(
+                rx_count=('Rx #', 'count'),
+                ins_rx=('Rx Status', lambda x: int(x.isin(['Paid-Ins', 'Transmitted']).sum())),
+                cash_rx=('Rx Status', lambda x: int(
+                    (x.str.strip().str.lower().str.replace(r'[^a-z]', '', regex=True) == 'paidcash').sum()
+                )),
+                prescriber_name=('Prescriber Name', most_common),
+                prescriber_phone=('Prescriber Phone #', 'first'),
+                prescriber_fax=('Prescriber Fax #', 'first'),
+                prescriber_city=('Prescriber City', 'first'),
+                prescriber_state=('Prescriber State', 'first'),
+                prescriber_address=('Prescriber Address 1', 'first'),
+                prescriber_zip=('Prescriber Zip', 'first'),
+                unique_addresses=('Prescriber Address', 'nunique'),
+                npi=('Prescriber NPI #', 'first')
+            )
+            .sort_values('rx_count', ascending=False)
+            .head(20)
+        )
+
+        for _, row in npi_grp.iterrows():
+            name = str(row['prescriber_name']).strip()
+            parts = [p.strip().capitalize() for p in name.split() if p.strip()]
+            display_name = ' '.join(parts)
+            initials = ''.join([p[0].upper() for p in parts[:2]])
+            pct = round((int(row['rx_count']) / total_rx) * 100, 1)
+
             top_doctors.append({
-                'name': name,
+                'npi': str(row['npi']),
+                'name': display_name,
                 'initials': initials,
-                'phone': str(phone).strip(),
-                'city': str(city).strip(),
-                'rx_count': int(row['rx_count'])
+                'phone': str(row['prescriber_phone']).strip(),
+                'fax': str(row['prescriber_fax']).strip(),
+                'city': str(row['prescriber_city']).strip(),
+                'state': str(row['prescriber_state']).strip(),
+                'address': str(row['prescriber_address']).strip(),
+                'zip': str(row['prescriber_zip']).strip(),
+                'rx_count': int(row['rx_count']),
+                'ins_rx': int(row['ins_rx']),
+                'cash_rx': int(row['cash_rx']),
+                'pct': pct,
+                'locations': int(row['unique_addresses'])
             })
 
     summary = ctx.get('summary', {})
+
+    main_file = ctx.get('outfile_main')
+    excel_data = {}
+
+    if main_file and os.path.exists(main_file):
+        try:
+            df = pd.read_excel(
+                main_file,
+                sheet_name='Do Not Order - ALL',
+                dtype=str,
+                header=1
+            )
+            df = df.dropna(how='all').fillna('')
+            excel_data['do_not_order'] = {
+                'count': len(df),
+                'columns': df.columns.tolist(),
+                'rows': df.head(100).values.tolist()
+            }
+        except Exception as e:
+            print(f'[DEBUG] Sheet error: {e}')
+            excel_data['do_not_order'] = {
+                'count': 0,
+                'columns': [],
+                'rows': []
+            }
 
     return render_template('dashboard.html',
         pharmacy_name=ctx.get('pharmacy_name', 'Pharmacy'),
         date_range=ctx.get('date_range', ''),
         summary=summary,
         top_doctors=top_doctors,
+        excel_data=excel_data,
         job_id=job_id
     )
+
+
+@bp.route('/api/sheet_data')
+def sheet_data():
+    job_id = request.args.get('job_id', '')
+    sheet = request.args.get('sheet', '')
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+
+    ctx = _JOB_CACHE.get(job_id)
+    if not ctx:
+        return jsonify({'ok': False}), 404
+
+    main_file = ctx.get('outfile_main')
+    if not main_file or not os.path.exists(main_file):
+        return jsonify({'ok': False}), 404
+
+    sheet_map = {
+        'do_not_order': 'Do Not Order - ALL',
+    }
+
+    sheet_name = sheet_map.get(sheet)
+    if not sheet_name:
+        return jsonify({'ok': False}), 400
+
+    try:
+        df = pd.read_excel(
+            main_file,
+            sheet_name=sheet_name,
+            dtype=str,
+            header=1
+        )
+        df = df.dropna(how='all').fillna('')
+
+        total = len(df)
+        start = (page - 1) * per_page
+        end = start + per_page
+        rows = df.iloc[start:end].values.tolist()
+
+        return jsonify({
+            'ok': True,
+            'total': total,
+            'page': page,
+            'rows': rows,
+            'columns': df.columns.tolist(),
+            'has_more': end < total
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 @bp.route('/pick_folder', methods=['GET'])
