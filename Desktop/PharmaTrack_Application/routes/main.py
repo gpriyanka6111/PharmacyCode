@@ -314,6 +314,69 @@ def upload_file():
         kinray_clean['NDC/UPC'].nunique()
     )
 
+    # === Branded drugs purchased but not billed ===
+    branded_not_billed = []
+
+    try:
+        # Get branded drugs from Kinray
+        branded_kinray = kinray_clean[
+            kinray_clean['Type'] == 'Branded Drug'
+        ].copy()
+
+        # Normalize NDC — strip all non-digits then strip leading zeros for matching
+        branded_kinray['NDC_norm'] = (
+            branded_kinray['NDC/UPC'].astype(str)
+            .str.replace(r'\D', '', regex=True)
+            .str.lstrip('0')
+        )
+
+        log_df['NDC_norm'] = (
+            log_df['Drug NDC'].astype(str)
+            .str.replace(r'\D', '', regex=True)
+            .str.lstrip('0')
+        )
+
+        # Get all billed NDCs from custom log
+        billed_ndcs = set(log_df['NDC_norm'].unique())
+
+        # Group branded by NDC
+        branded_grp = (
+            branded_kinray
+            .groupby(['NDC_norm', 'Description'])
+            .agg(total_cost=('__price__', 'sum'))
+            .reset_index()
+            .sort_values('total_cost', ascending=False)
+        )
+
+        # Find ones never billed
+        never_billed = branded_grp[
+            ~branded_grp['NDC_norm'].isin(billed_ndcs)
+        ]
+
+        # Known vaccine NDC keywords
+        VACCINE_KEYWORDS = [
+            'SHINGRIX', 'PREVNAR', 'FLUZONE',
+            'FLUARIX', 'FLUCELVAX', 'PNEUMOVAX',
+            'BEXSERO', 'TRUMENBA', 'GARDASIL',
+            'VARIVAX', 'PROQUAD', 'ZOSTAVAX',
+            'RECOMBIVAX', 'ENGERIX', 'TWINRIX',
+            'HAVRIX', 'VAQTA', 'TDVAX', 'BOOSTRIX',
+            'DAPTACEL', 'INFANRIX', 'PEDIARIX'
+        ]
+
+        for _, row in never_billed.iterrows():
+            desc = str(row['Description']).upper()
+            is_vaccine = any(v in desc for v in VACCINE_KEYWORDS)
+            branded_not_billed.append({
+                'drug': str(row['Description']),
+                'cost': float(row['total_cost']),
+                'is_vaccine': is_vaccine,
+                'status': 'Vaccine — billed separately' if is_vaccine else 'Investigate'
+            })
+
+    except Exception as e:
+        print(f'[DEBUG] Branded not billed error: {e}')
+
     # Breakdown by Type
     kinray_by_type = []
     if 'Type' in kinray_clean.columns:
@@ -347,6 +410,10 @@ def upload_file():
         "kinray_by_type": kinray_by_type,
         "cash_rx_count": int(len(cash_df)) if len(cash_df) > 0 else 0,
         "cash_rx_total": float(cash_df['__total__'].sum()) if len(cash_df) > 0 and '__total__' in cash_df.columns else 0.0,
+        "branded_not_billed": branded_not_billed,
+        "branded_not_billed_count": len(branded_not_billed),
+        "branded_not_billed_total": sum(d['cost'] for d in branded_not_billed),
+        "branded_not_billed_investigate_total": sum(d['cost'] for d in branded_not_billed if not d['is_vaccine']),
     }
 
     # cache minimal job context for finalize
@@ -688,26 +755,32 @@ def dashboard():
     excel_data = {}
 
     if main_file and os.path.exists(main_file):
-        try:
-            df = pd.read_excel(
-                main_file,
-                sheet_name='Do Not Order - ALL',
-                dtype=str,
-                header=1
-            )
-            df = df.dropna(how='all').fillna('')
-            excel_data['do_not_order'] = {
-                'count': len(df),
-                'columns': df.columns.tolist(),
-                'rows': df.head(100).values.tolist()
-            }
-        except Exception as e:
-            print(f'[DEBUG] Sheet error: {e}')
-            excel_data['do_not_order'] = {
-                'count': 0,
-                'columns': [],
-                'rows': []
-            }
+        for key, sheet_name in {
+            'needs_ordering': 'Needs to be ordered - All',
+            'do_not_order': 'Do Not Order - ALL',
+            'never_purchased': 'Never Ordered - Check',
+            'rx_comparison': 'RX Comparison - All',
+        }.items():
+            try:
+                df = pd.read_excel(
+                    main_file,
+                    sheet_name=sheet_name,
+                    dtype=str,
+                    header=1
+                )
+                df = df.dropna(how='all').fillna('')
+                excel_data[key] = {
+                    'count': len(df),
+                    'columns': df.columns.tolist(),
+                    'rows': df.head(100).values.tolist()
+                }
+            except Exception as e:
+                print(f'[DEBUG] {key}: {e}')
+                excel_data[key] = {
+                    'count': 0,
+                    'columns': [],
+                    'rows': []
+                }
 
     return render_template('dashboard.html',
         pharmacy_name=ctx.get('pharmacy_name', 'Pharmacy'),
@@ -736,6 +809,9 @@ def sheet_data():
 
     sheet_map = {
         'do_not_order': 'Do Not Order - ALL',
+        'needs_ordering': 'Needs to be ordered - All',
+        'never_purchased': 'Never Ordered - Check',
+        'rx_comparison': 'RX Comparison - All',
     }
 
     sheet_name = sheet_map.get(sheet)
@@ -766,6 +842,219 @@ def sheet_data():
         })
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@bp.route('/sheet/do_not_order')
+def sheet_do_not_order():
+    job_id = request.args.get('job_id', '')
+    ctx = _JOB_CACHE.get(job_id)
+    if not ctx:
+        return redirect('/')
+
+    main_file = ctx.get('outfile_main')
+    rows = []
+    columns = []
+    error = None
+
+    if main_file and os.path.exists(main_file):
+        try:
+            df = pd.read_excel(
+                main_file,
+                sheet_name='Do Not Order - ALL',
+                dtype=str,
+                header=1
+            )
+            df = df.dropna(how='all').fillna('')
+            columns = df.columns.tolist()
+            rows = df.values.tolist()
+        except Exception as e:
+            error = str(e)
+
+    return render_template(
+        'sheet_view.html',
+        pharmacy_name=ctx.get('pharmacy_name', 'Pharmacy'),
+        date_range=ctx.get('date_range', ''),
+        job_id=job_id,
+        columns=columns,
+        rows=rows,
+        error=error,
+        sheet_key='do_not_order',
+        sheet_title='Drugs overstocked — do not order',
+        sheet_count=len(rows),
+        sheet_badge_color='#EAF3DE',
+        sheet_badge_text_color='#3B6D11',
+        sheet_accent_color='#639922',
+        sheet_export_bg='#3b7c0f',
+        severity_col='Do Not Order',
+        high_label='High >10',
+        med_label='Medium 5-10',
+        low_label='Low <5',
+    )
+
+
+@bp.route('/sheet/needs_ordering')
+def sheet_needs_ordering():
+    job_id = request.args.get('job_id', '')
+    ctx = _JOB_CACHE.get(job_id)
+    if not ctx:
+        return redirect('/')
+
+    main_file = ctx.get('outfile_main')
+    sheet_data = {
+        'count': 0,
+        'columns': [],
+        'rows': []
+    }
+
+    if main_file and os.path.exists(main_file):
+        try:
+            df = pd.read_excel(
+                main_file,
+                sheet_name='Needs to be ordered - All',
+                dtype=str,
+                header=1
+            )
+            df = df.dropna(how='all').fillna('')
+            sheet_data = {
+                'count': len(df),
+                'columns': df.columns.tolist(),
+                'rows': df.head(100).values.tolist()
+            }
+        except Exception as e:
+            print(f'[DEBUG] Needs ordering sheet error: {e}')
+
+    return render_template(
+        'sheet_view.html',
+        job_id=job_id,
+        pharmacy_name=ctx.get('pharmacy_name', ''),
+        date_range=ctx.get('date_range', ''),
+        sheet_key='needs_ordering',
+        sheet_title='Drugs that need ordering',
+        sheet_count=sheet_data['count'],
+        sheet_badge_color='#FCEBEB',
+        sheet_badge_text_color='#A32D2D',
+        sheet_accent_color='#E24B4A',
+        sheet_export_bg='#E24B4A',
+        columns=sheet_data['columns'],
+        rows=sheet_data['rows'],
+        severity_col='Needs to be Ordered',
+        high_label='Critical >10',
+        med_label='Medium 5-10',
+        low_label='Low <5',
+        high_color='#E24B4A',
+        med_color='#EF9F27',
+        low_color='#639922',
+    )
+
+
+@bp.route('/sheet/never_purchased')
+def sheet_never_purchased():
+    job_id = request.args.get('job_id', '')
+    ctx = _JOB_CACHE.get(job_id)
+    if not ctx:
+        return redirect('/')
+
+    main_file = ctx.get('outfile_main')
+    sheet_data = {
+        'count': 0,
+        'columns': [],
+        'rows': []
+    }
+
+    if main_file and os.path.exists(main_file):
+        try:
+            df = pd.read_excel(
+                main_file,
+                sheet_name='Never Ordered - Check',
+                dtype=str,
+                header=1
+            )
+            df = df.dropna(how='all').fillna('')
+            sheet_data = {
+                'count': len(df),
+                'columns': df.columns.tolist(),
+                'rows': df.head(100).values.tolist()
+            }
+        except Exception as e:
+            print(f'[DEBUG] Never purchased sheet error: {e}')
+
+    return render_template(
+        'sheet_view.html',
+        job_id=job_id,
+        pharmacy_name=ctx.get('pharmacy_name', ''),
+        date_range=ctx.get('date_range', ''),
+        sheet_key='never_purchased',
+        sheet_title='Never purchased — investigate',
+        sheet_count=sheet_data['count'],
+        sheet_badge_color='#FAEEDA',
+        sheet_badge_text_color='#854F0B',
+        sheet_accent_color='#854F0B',
+        sheet_export_bg='#854F0B',
+        columns=sheet_data['columns'],
+        rows=sheet_data['rows'],
+        severity_col='Never Ordered',
+        high_label='Critical >10',
+        med_label='Medium 5-10',
+        low_label='Low <5',
+        high_color='#E24B4A',
+        med_color='#EF9F27',
+        low_color='#639922',
+    )
+
+
+@bp.route('/sheet/rx_comparison')
+def sheet_rx_comparison():
+    job_id = request.args.get('job_id', '')
+    ctx = _JOB_CACHE.get(job_id)
+    if not ctx:
+        return redirect('/')
+
+    main_file = ctx.get('outfile_main')
+    sheet_data = {
+        'count': 0,
+        'columns': [],
+        'rows': []
+    }
+
+    if main_file and os.path.exists(main_file):
+        try:
+            df = pd.read_excel(
+                main_file,
+                sheet_name='RX Comparison - All',
+                dtype=str,
+                header=1
+            )
+            df = df.dropna(how='all').fillna('')
+            sheet_data = {
+                'count': len(df),
+                'columns': df.columns.tolist(),
+                'rows': df.head(100).values.tolist()
+            }
+        except Exception as e:
+            print(f'[DEBUG] RX Comparison sheet error: {e}')
+
+    return render_template(
+        'sheet_view.html',
+        job_id=job_id,
+        pharmacy_name=ctx.get('pharmacy_name', ''),
+        date_range=ctx.get('date_range', ''),
+        sheet_key='rx_comparison',
+        sheet_title='Rx comparison — underpayment analysis',
+        sheet_count=sheet_data['count'],
+        sheet_badge_color='#E6F1FB',
+        sheet_badge_text_color='#185FA5',
+        sheet_accent_color='#185FA5',
+        sheet_export_bg='#185FA5',
+        columns=sheet_data['columns'],
+        rows=sheet_data['rows'],
+        severity_col='Difference',
+        high_label='Underpaid >$10',
+        med_label='Underpaid $5-$10',
+        low_label='Underpaid <$5',
+        high_color='#E24B4A',
+        med_color='#EF9F27',
+        low_color='#639922',
+    )
 
 
 @bp.route('/pick_folder', methods=['GET'])

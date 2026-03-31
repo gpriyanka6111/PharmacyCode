@@ -467,23 +467,23 @@
     <!-- ── ALERT CARDS ── -->
     <div class="row g-3 mb-3">
       <div class="col-6 col-md-3">
-        <div class="alert-card red h-100">
-          <div class="alert-num">103</div>
+        <div class="alert-card red h-100" onclick="window.location.href='/sheet/needs_ordering?job_id={{ job_id }}'" style="cursor:pointer">
+          <div class="alert-num">{{ excel_data.needs_ordering.count | default(0) }}</div>
           <div class="alert-title">Drugs need ordering</div>
           <div class="alert-sub">Est. $8,420 in lost margin</div>
           <div class="alert-link">View order list</div>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="alert-card amber h-100">
-          <div class="alert-num">45</div>
+        <div class="alert-card amber h-100" onclick="window.location.href='/sheet/never_purchased?job_id={{ job_id }}'" style="cursor:pointer">
+          <div class="alert-num">{{ excel_data.never_purchased.count | default(0) }}</div>
           <div class="alert-title">Never purchased &mdash; check</div>
           <div class="alert-sub">$12,300 at risk</div>
           <div class="alert-link">Investigate now</div>
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="alert-card green h-100" onclick="togglePanel('donotorder')" style="cursor:pointer">
+        <div class="alert-card green h-100" onclick="window.location='/sheet/do_not_order?job_id={{ job_id }}'" style="cursor:pointer">
           <div class="alert-num">{{ excel_data.do_not_order.count | default(0) }}</div>
           <div class="alert-title">Drugs overstocked</div>
           <div class="alert-sub">Do not order these items</div>
@@ -491,14 +491,101 @@
         </div>
       </div>
       <div class="col-6 col-md-3">
-        <div class="alert-card blue h-100">
-          <div class="alert-num">1,878</div>
+        <div class="alert-card blue h-100" onclick="window.location.href='/sheet/rx_comparison?job_id={{ job_id }}'" style="cursor:pointer">
+          <div class="alert-num">{{ excel_data.rx_comparison.count | default(0) }}</div>
           <div class="alert-title">Rx comparisons analyzed</div>
           <div class="alert-sub">47 underpayments detected</div>
           <div class="alert-link">View full comparison</div>
         </div>
       </div>
     </div>
+
+    {% if summary.branded_not_billed_count > 0 %}
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <span style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Financial alerts</span>
+          <span style="font-size:12px;color:var(--color-text-secondary);margin-left:8px">Issues requiring attention</span>
+        </div>
+        <span style="background:#FCEBEB;color:#A32D2D;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px">
+          ${{ '{:,.0f}'.format(summary.branded_not_billed_total | default(0)) }} at risk
+        </span>
+      </div>
+
+      <div style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:12px;overflow:hidden;cursor:pointer"
+           id="unbilled-card"
+           onclick="toggleUnbilled()">
+        <div style="height:3px;background:#E24B4A"></div>
+        <div style="padding:14px 16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:32px;height:32px;border-radius:8px;background:#FCEBEB;display:flex;align-items:center;justify-content:center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A32D2D" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Branded drugs purchased but not billed</div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">Purchased from Kinray but no matching Rx found in BestRx</div>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-left:16px">
+              <div style="font-size:20px;font-weight:500;color:#A32D2D">
+                ${{ '{:,.0f}'.format(summary.branded_not_billed_total | default(0)) }}
+              </div>
+              <div style="font-size:11px;color:var(--color-text-secondary)">
+                {{ summary.branded_not_billed_count | default(0) }} drugs · click to view
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-unbilled">
+        <div class="panel-header">
+          <div class="panel-title">Branded drugs purchased but not billed</div>
+          <button class="close-btn" onclick="toggleUnbilled()">×</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="panel-table">
+            <thead>
+              <tr>
+                <th>Drug name</th>
+                <th style="text-align:right">Kinray cost</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for drug in summary.branded_not_billed | default([]) %}
+              <tr>
+                <td style="font-weight:500">{{ drug.drug }}</td>
+                <td style="text-align:right;font-weight:500;color:{% if drug.is_vaccine %}#854F0B{% else %}#A32D2D{% endif %}">
+                  ${{ '{:,.2f}'.format(drug.cost) }}
+                </td>
+                <td>
+                  {% if drug.is_vaccine %}
+                  <span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:2px 7px;border-radius:20px">Vaccine — billed separately</span>
+                  {% else %}
+                  <span style="font-size:10px;background:#FCEBEB;color:#A32D2D;padding:2px 7px;border-radius:20px">Investigate</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="panel-footer">
+          <span>
+            {{ summary.branded_not_billed_count | default(0) }} drugs ·
+            ${{ '{:,.0f}'.format(summary.branded_not_billed_investigate_total | default(0)) }} needs investigation (excl. vaccines)
+          </span>
+          <button class="export-sm" onclick="exportUnbilled()">Export CSV</button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
 
     <script>
     const EXCEL_DATA = {{ excel_data | tojson }};
@@ -872,6 +959,30 @@
           if (!data.has_more) document.getElementById('loadmore-dno').style.display = 'none';
         }
       } catch(e) { console.error(e); }
+    }
+
+    let unbilledOpen = false;
+
+    function toggleUnbilled() {
+      unbilledOpen = !unbilledOpen;
+      const panel = document.getElementById('panel-unbilled');
+      const card  = document.getElementById('unbilled-card');
+      panel.classList.toggle('open', unbilledOpen);
+      card.style.boxShadow = unbilledOpen ? '0 0 0 2px #E24B4A' : 'none';
+    }
+
+    function exportUnbilled() {
+      const drugs = {{ summary.branded_not_billed | tojson }};
+      const headers = 'Drug Name,Kinray Cost,Status';
+      const rows = drugs.map(d =>
+        `"${d.drug}",${d.cost.toFixed(2)},"${d.status}"`
+      ).join('\n');
+      const csv = headers + '\n' + rows;
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'branded_not_billed.csv';
+      a.click();
     }
 
     function exportDNO() {
