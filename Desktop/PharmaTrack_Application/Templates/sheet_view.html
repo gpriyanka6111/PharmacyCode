@@ -491,9 +491,22 @@
     return colName.endsWith('_D') || colName.endsWith('_d');
   }
 
+  const HIDDEN_COLS = new Set([
+    'Insurance-wise Order Estimate ($)',
+    'Amount',
+    'Drug Type',
+  ]);
+  function isHiddenCol(colName) {
+    if (!colName) return false;
+    if (HIDDEN_COLS.has(colName)) return true;
+    if (colName.toLowerCase().includes('insurance-wise')) return true;
+    return false;
+  }
+
   function buildHeader() {
     const tr = document.createElement('tr');
     COLUMNS.forEach((col, i) => {
+      if (isHiddenCol(col)) return;
       const isHiddenProc = (col.endsWith('_D') || col.endsWith('_d')) &&
         col !== 'ALL_PBM_D' && !activeProcs.has(col);
       if (isHiddenProc) return;
@@ -529,6 +542,8 @@
         th.style.minWidth = COL_WIDTHS[i];
         th.style.maxWidth = COL_WIDTHS[i];
       }
+      // Explicit center alignment for all header cells (matches td alignment below)
+      if (!isProc) th.style.textAlign = 'center';
 
       if (i === sortCol) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
       th.onclick = () => doSort(i);
@@ -565,10 +580,16 @@
         const sev = getSeverity(getDNOVal(row));
         if (sev !== activeSev) return false;
       }
-      // Drug Type filter — Unclassified always shows
+      // Drug Type filter
       if (activeTypeFilter !== 'all' && DRUG_TYPE_COL >= 0) {
         const rowType = String(row[DRUG_TYPE_COL] || '').trim();
-        if (rowType !== activeTypeFilter && rowType !== 'Unclassified') return false;
+        if (activeTypeFilter === 'Unclassified') {
+          // Unclassified button → show ONLY Unclassified
+          if (rowType !== 'Unclassified') return false;
+        } else {
+          // Branded/Generic/OTC → show that type + Unclassified
+          if (rowType !== activeTypeFilter && rowType !== 'Unclassified') return false;
+        }
       }
       return true;
     });
@@ -601,6 +622,7 @@
       tr.className = sev === 'high' ? 'row-high' : sev === 'med' ? 'row-medium' : 'row-low';
       row.forEach((cell, i) => {
         const col = COLUMNS[i] || '';
+        if (isHiddenCol(col)) return;
         const isHiddenProc = (col.endsWith('_D') || col.endsWith('_d')) &&
           col !== 'ALL_PBM_D' && !activeProcs.has(col);
         if (isHiddenProc) return;
@@ -610,30 +632,37 @@
         const isProc = isProcessorCol(col);
         const numVal = parseFloat(String(cell).replace(',',''));
         const isZero = !isNaN(numVal) && numVal === 0;
+        const isNegative = !isNaN(numVal) && numVal < 0;
 
         // Freeze first 3 cols
         if (isFreeze) {
           td.classList.add('col-freeze', `col-freeze-${i}`);
         }
 
-        // Processor column styling
-        if (isProc) {
+        // Cell content + styling
+        if (i === DNO_COL) {
+          td.innerHTML = `<span class="dno-val">${cell}</span>`;
+          td.style.textAlign = 'center';
+        } else if (isNegative) {
+          td.style.background = '#FFF0F0';
+          td.style.color = '#CC0000';
+          td.style.fontWeight = '600';
+          td.style.textAlign = 'center';
+          td.textContent = cell;
+        } else if (isProc) {
           td.style.textAlign = 'center';
           td.style.padding = '8px 4px';
           td.style.fontSize = isZero ? '0.72rem' : '0.82rem';
-          if (i === DNO_COL) {
-            td.innerHTML = `<span class="dno-val">${cell}</span>`;
-          } else if (isZero) {
+          if (isZero) {
             td.classList.add('proc-cell-zero');
-            td.textContent = cell;
           } else {
             td.classList.add('proc-cell-val');
-            td.textContent = cell;
           }
-        } else if (i === DNO_COL) {
-          td.innerHTML = `<span class="dno-val">${cell}</span>`;
+          td.textContent = cell;
         } else {
           td.textContent = cell;
+          // Center all non-text columns; keep Drug Name left-aligned
+          if (i !== NAME_COL) td.style.textAlign = 'center';
         }
         tr.appendChild(td);
       });
@@ -778,28 +807,41 @@
           const tr = document.createElement('tr');
           tr.className = sev === 'high' ? 'row-high' : sev === 'med' ? 'row-medium' : 'row-low';
           row.forEach((cell, i) => {
+            const col = data.columns[i] || '';
+            if (isHiddenCol(col)) return;
+            const isHiddenProc = (col.endsWith('_D') || col.endsWith('_d')) &&
+              col !== 'ALL_PBM_D' && !activeProcs.has(col);
+            if (isHiddenProc) return;
+
             const td = document.createElement('td');
             const isFreeze = i < 3;
-            const isProc = isProcessorCol(data.columns[i] || '');
+            const isProc = isProcessorCol(col);
             const numVal = parseFloat(String(cell).replace(',',''));
             const isZero = !isNaN(numVal) && numVal === 0;
+            const isNegative = !isNaN(numVal) && numVal < 0;
             if (isFreeze) td.classList.add('col-freeze', `col-freeze-${i}`);
-            if (isProc) {
+            if (i === dnoIdx) {
+              td.innerHTML = `<span class="dno-val">${cell}</span>`;
+              td.style.textAlign = 'center';
+            } else if (isNegative) {
+              td.style.background = '#FFF0F0';
+              td.style.color = '#CC0000';
+              td.style.fontWeight = '600';
+              td.style.textAlign = 'center';
+              td.textContent = cell;
+            } else if (isProc) {
               td.style.textAlign = 'center';
               td.style.padding = '8px 4px';
-              if (i === dnoIdx) {
-                td.innerHTML = `<span class="dno-val">${cell}</span>`;
-              } else if (isZero) {
+              if (isZero) {
                 td.classList.add('proc-cell-zero');
-                td.textContent = cell;
               } else {
                 td.classList.add('proc-cell-val');
-                td.textContent = cell;
               }
-            } else if (i === dnoIdx) {
-              td.innerHTML = `<span class="dno-val">${cell}</span>`;
+              td.textContent = cell;
             } else {
               td.textContent = cell;
+              const loadNameCol = data.columns.findIndex(c => c.toLowerCase().includes('drug') && c.toLowerCase().includes('name'));
+              if (i !== loadNameCol) td.style.textAlign = 'center';
             }
             tr.appendChild(td);
           });
