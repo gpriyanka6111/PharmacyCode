@@ -324,34 +324,36 @@
 
   <!-- ── Stat cards ── -->
   <div class="row g-3 mb-4" id="stat-cards">
+    {% if stat_labels %}
     <div class="col-6 col-md-3">
       <div class="stat-card">
         <div class="stat-label">Total drugs</div>
         <div class="stat-value dark" id="stat-total">{{ sheet_count }}</div>
-        <div class="stat-sub">overstocked</div>
+        <div class="stat-sub">{{ stat_labels.total_sub }}</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
       <div class="stat-card">
-        <div class="stat-label">High overstock (&gt;10)</div>
+        <div class="stat-label">{{ stat_labels.high_label }} ({{ stat_labels.high_threshold }})</div>
         <div class="stat-value red" id="stat-high">—</div>
-        <div class="stat-sub">need attention</div>
+        <div class="stat-sub">{{ stat_labels.high_sub }}</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
       <div class="stat-card">
-        <div class="stat-label">Medium overstock (5-10)</div>
+        <div class="stat-label">{{ stat_labels.med_label }} ({{ stat_labels.med_threshold }})</div>
         <div class="stat-value amber" id="stat-med">—</div>
-        <div class="stat-sub">monitor closely</div>
+        <div class="stat-sub">{{ stat_labels.med_sub }}</div>
       </div>
     </div>
     <div class="col-6 col-md-3">
       <div class="stat-card">
-        <div class="stat-label">Low overstock (&lt;5)</div>
+        <div class="stat-label">{{ stat_labels.low_label }} ({{ stat_labels.low_threshold }})</div>
         <div class="stat-value green" id="stat-low">—</div>
-        <div class="stat-sub">acceptable range</div>
+        <div class="stat-sub">{{ stat_labels.low_sub }}</div>
       </div>
     </div>
+    {% endif %}
   </div>
 
   <!-- ── Controls ── -->
@@ -370,6 +372,22 @@
         <button class="filter-btn sev-med"  id="btn-med"  onclick="toggleSev('med')">{{ med_label }}</button>
         <button class="filter-btn sev-low"  id="btn-low"  onclick="toggleSev('low')">{{ low_label }}</button>
       </div>
+      {% if drug_types %}
+      <div class="d-flex gap-1 ms-1" style="border-left:1px solid var(--border);padding-left:10px;">
+        <span style="font-size:0.8rem;color:var(--muted);align-self:center;margin-right:2px;">Type:</span>
+        <button class="filter-btn active" id="btn-type-all" onclick="setTypeFilter('all')">All</button>
+        {% for dt in drug_types %}
+        <button class="filter-btn" id="btn-type-{{ loop.index }}" data-dtype="{{ dt }}" onclick="setTypeFilter('{{ dt }}')">
+          {{ dt.replace(' Drug','').replace(' Aid','').replace(' Care','') }}
+        </button>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="d-flex align-items-center gap-2 mt-2 pt-2 flex-wrap" style="border-top:1px solid var(--border)">
+      <span style="font-size:0.8rem;color:var(--muted);white-space:nowrap">Insurances:</span>
+      <div id="proc-pills" style="display:flex;flex-wrap:wrap;gap:5px"></div>
+      <span id="proc-note" style="font-size:0.75rem;color:var(--amber)"></span>
     </div>
   </div>
 
@@ -411,6 +429,8 @@
 <script>
   const COLUMNS = {{ columns | tojson }};
   const ALL_ROWS = {{ rows | tojson }};
+  const STAT_LABELS = {{ stat_labels | tojson }};
+  const DRUG_TYPES = {{ drug_types | tojson }};
 
   // Pagination state
   let currentPage = 1;
@@ -430,6 +450,17 @@
   // Find drug name and NDC columns
   const NAME_COL = COLUMNS.findIndex(c => c.toLowerCase().includes('drug') && c.toLowerCase().includes('name'));
   const NDC_COL  = COLUMNS.findIndex(c => c.toLowerCase().includes('ndc'));
+
+  const DRUG_TYPE_COL = COLUMNS.indexOf('Drug Type');
+  let activeTypeFilter = 'all';
+
+  const PROC_COLS = COLUMNS.reduce((acc, col, i) => {
+    if ((col.endsWith('_D') || col.endsWith('_d')) && col !== 'ALL_PBM_D') {
+      acc.push({ name: col.replace(/_D$/i, ''), idx: i, col: col });
+    }
+    return acc;
+  }, []);
+  let activeProcs = new Set(PROC_COLS.map(p => p.col));
 
   let currentLimit = 'all';
   let activeSev = null;   // 'high' | 'med' | 'low' | null
@@ -463,6 +494,10 @@
   function buildHeader() {
     const tr = document.createElement('tr');
     COLUMNS.forEach((col, i) => {
+      const isHiddenProc = (col.endsWith('_D') || col.endsWith('_d')) &&
+        col !== 'ALL_PBM_D' && !activeProcs.has(col);
+      if (isHiddenProc) return;
+
       const th = document.createElement('th');
       const isFreeze = i < 3;
       const isProc = isProcessorCol(col);
@@ -530,6 +565,11 @@
         const sev = getSeverity(getDNOVal(row));
         if (sev !== activeSev) return false;
       }
+      // Drug Type filter — Unclassified always shows
+      if (activeTypeFilter !== 'all' && DRUG_TYPE_COL >= 0) {
+        const rowType = String(row[DRUG_TYPE_COL] || '').trim();
+        if (rowType !== activeTypeFilter && rowType !== 'Unclassified') return false;
+      }
       return true;
     });
 
@@ -560,9 +600,14 @@
       const tr = document.createElement('tr');
       tr.className = sev === 'high' ? 'row-high' : sev === 'med' ? 'row-medium' : 'row-low';
       row.forEach((cell, i) => {
+        const col = COLUMNS[i] || '';
+        const isHiddenProc = (col.endsWith('_D') || col.endsWith('_d')) &&
+          col !== 'ALL_PBM_D' && !activeProcs.has(col);
+        if (isHiddenProc) return;
+
         const td = document.createElement('td');
         const isFreeze = i < 3;
-        const isProc = isProcessorCol(COLUMNS[i] || '');
+        const isProc = isProcessorCol(col);
         const numVal = parseFloat(String(cell).replace(',',''));
         const isZero = !isNaN(numVal) && numVal === 0;
 
@@ -617,16 +662,75 @@
   }
 
   function computeStats() {
+    if (!STAT_LABELS) return;
+    const highMin = STAT_LABELS.high_min;
+    const medMin  = STAT_LABELS.med_min;
+    const medMax  = STAT_LABELS.med_max;
     let high = 0, med = 0, low = 0;
     ALL_ROWS.forEach(row => {
-      const v = getDNOVal(row);
-      if (v > 10) high++;
-      else if (v >= 5) med++;
+      const v = Math.abs(getDNOVal(row));
+      if (v > highMin) high++;
+      else if (v >= medMin && v <= medMax) med++;
       else low++;
     });
     document.getElementById('stat-high').textContent = high;
     document.getElementById('stat-med').textContent  = med;
     document.getElementById('stat-low').textContent  = low;
+  }
+
+  function setTypeFilter(type) {
+    activeTypeFilter = type;
+    document.querySelectorAll('[id^="btn-type-"]').forEach(b => b.classList.remove('active'));
+    if (type === 'all') {
+      document.getElementById('btn-type-all')?.classList.add('active');
+    } else {
+      document.querySelectorAll(`[data-dtype="${type}"]`).forEach(b => b.classList.add('active'));
+    }
+    applyFilters();
+  }
+
+  function buildProcPills() {
+    const container = document.getElementById('proc-pills');
+    if (!container || !PROC_COLS.length) return;
+    container.innerHTML = PROC_COLS.map(p => `
+      <span id="pill-${p.name}"
+            onclick="toggleProc('${p.col}','${p.name}')"
+            style="display:inline-flex;align-items:center;gap:3px;padding:3px 10px;
+                   border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;
+                   background:#E6F1FB;color:#0C447C;border:1px solid #B5D4F4;
+                   user-select:none;transition:all 0.15s">
+        ${p.name}
+      </span>
+    `).join('');
+  }
+
+  function toggleProc(colName, displayName) {
+    const pill = document.getElementById('pill-' + displayName);
+    if (activeProcs.has(colName)) {
+      if (activeProcs.size <= 1) return;
+      activeProcs.delete(colName);
+      if (pill) {
+        pill.style.background = 'var(--bg)';
+        pill.style.color = 'var(--muted)';
+        pill.style.borderColor = 'var(--border)';
+        pill.style.textDecoration = 'line-through';
+        pill.style.opacity = '0.6';
+      }
+    } else {
+      activeProcs.add(colName);
+      if (pill) {
+        pill.style.background = '#E6F1FB';
+        pill.style.color = '#0C447C';
+        pill.style.borderColor = '#B5D4F4';
+        pill.style.textDecoration = 'none';
+        pill.style.opacity = '1';
+      }
+    }
+    const hidden = PROC_COLS.filter(p => !activeProcs.has(p.col)).map(p => p.name);
+    const note = document.getElementById('proc-note');
+    if (note) note.textContent = hidden.length ? `Excluding: ${hidden.join(', ')}` : '';
+    buildHeader();
+    applyFilters();
   }
 
   function exportCSV() {
@@ -721,6 +825,7 @@
 
   // Init
   buildHeader();
+  buildProcPills();
   computeStats();
   applyFilters();
 </script>

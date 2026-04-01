@@ -426,6 +426,40 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
     else:
         processors = sorted(processors)
 
+    # Build NDC → Drug Type map from Kinray
+    kinray_type_map = {}
+    try:
+        kinray_kpath = [path for path in vendor_paths if 'kinray' in path.lower()][0]
+        kdf = pd.read_csv(kinray_kpath, dtype=str)
+        kdf = kdf[
+            kdf['Invoice Number'].notna() &
+            (kdf['Invoice Number'].astype(str).str.strip().ne('')) &
+            (kdf['Invoice Number'].astype(str).str.strip().ne('nan')) &
+            (kdf['Invoice Number'].astype(str).str.strip().ne('Invoice Number'))
+        ].copy()
+        kdf['NDC_norm'] = (
+            kdf['NDC/UPC'].astype(str)
+            .str.replace(r'\D', '', regex=True)
+            .str.lstrip('0')
+        )
+        kinray_type_map = dict(zip(kdf['NDC_norm'], kdf['Type']))
+    except Exception as e:
+        print(f'[DEBUG] Drug type map error: {e}')
+
+    # Add Drug Type to final
+    if 'NDC #' in final.columns:
+        final['NDC_norm'] = (
+            final['NDC #'].astype(str)
+            .str.replace(r'\D', '', regex=True)
+            .str.lstrip('0')
+        )
+        final['Drug Type'] = (
+            final['NDC_norm']
+            .map(kinray_type_map)
+            .fillna('Unclassified')
+        )
+        final = final.drop(columns=['NDC_norm'])
+
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     # NEW: Split out rows that have NaN anywhere in the final report
     nan_mask = final.isna().any(axis=1)

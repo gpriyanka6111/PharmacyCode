@@ -870,6 +870,35 @@ def sheet_do_not_order():
         except Exception as e:
             error = str(e)
 
+    drug_types = []
+    if main_file and os.path.exists(main_file):
+        try:
+            dft = pd.read_excel(
+                main_file,
+                sheet_name='Do Not Order - ALL',
+                dtype=str, header=1
+            )
+            dft = dft.dropna(how='all')
+            if 'Drug Type' in dft.columns:
+                type_order = [
+                    'Branded Drug', 'Generic Drug', 'OTC Drug',
+                    'Home Health Care', 'Health and Beauty Aid', 'Unclassified'
+                ]
+                all_types = dft['Drug Type'].dropna().unique().tolist()
+                drug_types = sorted(
+                    [t for t in all_types if t and t != 'nan'],
+                    key=lambda x: type_order.index(x) if x in type_order else 99
+                )
+        except Exception as e:
+            print(f'[DEBUG] drug types: {e}')
+
+    # Fallback if Drug Type not in sheet yet (pre-regeneration)
+    if not drug_types:
+        drug_types = [
+            'Branded Drug', 'Generic Drug', 'OTC Drug',
+            'Home Health Care', 'Health and Beauty Aid', 'Unclassified'
+        ]
+
     return render_template(
         'sheet_view.html',
         pharmacy_name=ctx.get('pharmacy_name', 'Pharmacy'),
@@ -889,6 +918,22 @@ def sheet_do_not_order():
         high_label='High >10',
         med_label='Medium 5-10',
         low_label='Low <5',
+        drug_types=drug_types,
+        stat_labels={
+            'total_sub': 'overstocked',
+            'high_label': 'High overstock',
+            'high_sub': 'do not order',
+            'high_threshold': '>10',
+            'med_label': 'Medium overstock',
+            'med_sub': 'monitor',
+            'med_threshold': '5-10',
+            'low_label': 'Low overstock',
+            'low_sub': 'acceptable',
+            'low_threshold': '<5',
+            'high_min': 10,
+            'med_min': 5,
+            'med_max': 10,
+        },
     )
 
 
@@ -923,6 +968,35 @@ def sheet_needs_ordering():
         except Exception as e:
             print(f'[DEBUG] Needs ordering sheet error: {e}')
 
+    drug_types = []
+    if main_file and os.path.exists(main_file):
+        try:
+            dft = pd.read_excel(
+                main_file,
+                sheet_name='Needs to be ordered - All',
+                dtype=str, header=1
+            )
+            dft = dft.dropna(how='all')
+            if 'Drug Type' in dft.columns:
+                type_order = [
+                    'Branded Drug', 'Generic Drug', 'OTC Drug',
+                    'Home Health Care', 'Health and Beauty Aid', 'Unclassified'
+                ]
+                all_types = dft['Drug Type'].dropna().unique().tolist()
+                drug_types = sorted(
+                    [t for t in all_types if t and t != 'nan'],
+                    key=lambda x: type_order.index(x) if x in type_order else 99
+                )
+        except Exception as e:
+            print(f'[DEBUG] drug types: {e}')
+
+    # Fallback if Drug Type not in sheet yet (pre-regeneration)
+    if not drug_types:
+        drug_types = [
+            'Branded Drug', 'Generic Drug', 'OTC Drug',
+            'Home Health Care', 'Health and Beauty Aid', 'Unclassified'
+        ]
+
     return render_template(
         'sheet_view.html',
         job_id=job_id,
@@ -937,13 +1011,29 @@ def sheet_needs_ordering():
         sheet_export_bg='#E24B4A',
         columns=sheet_data['columns'],
         rows=sheet_data['rows'],
-        severity_col='Needs to be Ordered',
-        high_label='Critical >10',
-        med_label='Medium 5-10',
-        low_label='Low <5',
+        severity_col='To Order',
+        high_label='Critical >5',
+        med_label='Medium 2-4',
+        low_label='Low ≤1',
         high_color='#E24B4A',
         med_color='#EF9F27',
         low_color='#639922',
+        drug_types=drug_types,
+        stat_labels={
+            'total_sub': 'need ordering',
+            'high_label': 'High understock',
+            'high_sub': 'urgent',
+            'high_threshold': '>5',
+            'med_label': 'Medium understock',
+            'med_sub': 'monitor',
+            'med_threshold': '2-4',
+            'low_label': 'Low understock',
+            'low_sub': 'low priority',
+            'low_threshold': '≤1',
+            'high_min': 5,
+            'med_min': 2,
+            'med_max': 4,
+        },
     )
 
 
@@ -999,6 +1089,8 @@ def sheet_never_purchased():
         high_color='#E24B4A',
         med_color='#EF9F27',
         low_color='#639922',
+        drug_types=[],
+        stat_labels=None,
     )
 
 
@@ -1054,6 +1146,8 @@ def sheet_rx_comparison():
         high_color='#E24B4A',
         med_color='#EF9F27',
         low_color='#639922',
+        drug_types=[],
+        stat_labels=None,
     )
 
 
