@@ -1,67 +1,73 @@
-PharmaTrack – Pharmacy Data Processing and Audit System
-Overview
+# PharmaTrack – Pharmacy Data Processing and Audit System
 
-PharmaTrack is a backend-driven application built to process pharmacy data and generate structured Excel reports for audit and decision-making.
+## Overview
+PharmaTrack is a data processing application built to analyze pharmacy billing and purchase data. It generates structured Excel reports that help pharmacy owners understand financial performance and inventory needs.
 
-It helps pharmacy owners understand:
+The system processes multiple input files and applies business rules to identify losses, compare vendor purchases, and support audit workflows.
 
-Which drugs are causing financial loss
-Which insurance is underpaying
-What inventory needs to be reordered
+---
 
-The system is already used in real pharmacy operations.
+## Problem
+Pharmacies work with data from different sources:
+- Billing logs (custom log files)
+- Vendor purchase files (Kinray and others)
+- Insurance BIN mapping
 
-Problem
+This data is usually handled manually in Excel, which leads to:
+- Calculation errors  
+- No clear visibility into losses  
+- Time-consuming audit preparation  
 
-Pharmacies handle data from multiple sources:
+---
 
-Custom log files (billing data)
-Vendor purchase files (Kinray, McKesson, others)
-Insurance BIN mapping
+## Solution
+PharmaTrack automates the workflow:
+- Ingests multiple data sources
+- Applies pricing and insurance logic
+- Generates structured Excel reports with clear outputs
 
-This data is usually analyzed manually in Excel, which leads to:
+---
 
-Errors in calculations
-No clear visibility into losses
-Time-consuming audit preparation
-Solution
+## Features
 
-PharmaTrack automates the full workflow:
+### Input Handling
+- Custom Log (CSV)
+- Vendor Files (Excel)
+- BIN Mapping File (CSV)
 
-Processes multiple input files
-Applies pricing and insurance logic
-Generates structured Excel reports with clear insights
-Features
-Data Processing
-Accepts custom log (CSV)
-Accepts multiple vendor files (Excel)
-Accepts BIN mapping file (CSV)
-Business Logic
-Identifies winning insurance (Plan 1 vs Plan 2)
-Calculates:
-Quantity billed (Q)
-Insurance paid (P)
-Difference (D)
-Computes package-level billing using drug package size
-Pricing Logic
-Extracts latest vendor price per NDC
-Uses date-based fallback if price is missing
-Calculates final cost using quantity filled
-Output Reports
+### Data Processing
+- Standardizes vendor file formats
+- Maps insurance using BIN values
+- Identifies winning insurance (Plan 1 vs Plan 2)
 
-Generated Excel includes:
+### Calculations
+- Quantity billed (Q)
+- Insurance paid (P)
+- Difference (D)
+- Package-level billing using drug package size
 
-Insurance-wise quantity, paid, and difference columns
-Vendor purchase comparison
-Total purchased vs billed
+### Pricing Logic
+- Extracts latest vendor price per NDC
+- Uses date-based fallback when data is missing
+- Calculates cost based on quantity filled
 
-Sheets included:
+### Output Reports
+The generated Excel file includes:
+- Insurance-wise quantity, paid, and difference columns
+- Vendor purchase comparison
+- Total purchased vs billed
 
-Needs to be Ordered – identifies shortage using negative difference
-Do Not Order – excess inventory cases
-Never Ordered – billed but not purchased drugs
-Insurance from BIN Master – mapped insurance data
-Architecture
+Sheets generated:
+- Needs to be Ordered – identifies shortages
+- Do Not Order – identifies excess inventory
+- Never Ordered – billed but not purchased drugs
+- Insurance from BIN Master – mapped insurance data
+
+---
+
+## Architecture
+
+```
 User Upload
    ↓
 Flask Backend (routes)
@@ -70,35 +76,70 @@ Processing Layer (Pandas)
    ↓
 Pricing and BIN Mapping Logic
    ↓
-Business Rule Engine
+Business Rules
    ↓
 Excel Generation (OpenPyXL)
    ↓
 Downloadable Report
-Tech Stack
-Python
-Flask
-Pandas
-OpenPyXL
-HTML (basic frontend)
-Project Structure
-routes/        → API endpoints
-processing/    → core data processing logic
-utils/         → helper functions
-excel/         → Excel generation logic
-reports/       → output files
-Templates/     → frontend templates
-config.py      → configuration
-run.py         → application entry point
-Usage
-Upload the following files:
-Custom Log (CSV)
-Vendor Files (Excel)
-BIN Mapping File (CSV)
-Click submit
-Download the generated Excel report
-Real-World Impact
-Used in multiple pharmacy stores
-Reduces manual audit effort
-Identifies loss-making drugs
-Improves purchasing decisions
+```
+
+---
+
+## Tech Stack
+- Python
+- Flask
+- Pandas
+- OpenPyXL
+- HTML (basic frontend)
+
+---
+
+## Project Structure
+
+```
+routes/        API endpoints
+processing/    core data processing logic
+utils/         helper functions
+excel/         Excel generation logic
+reports/       generated output files
+Templates/     frontend templates
+config.py      configuration
+run.py         application entry point
+```
+
+---
+
+## Setup and Run
+
+### Prerequisites
+- Python 3.x
+
+### Installation
+```
+pip install -r requirements.txt
+```
+
+### Run Application
+```
+python run.py
+```
+
+---
+
+## Usage
+1. Upload required files:
+   - Custom Log (CSV)
+   - Vendor Files (Excel)
+   - BIN Mapping File (CSV)
+
+2. Submit for processing
+
+3. Download the generated Excel report
+
+---
+
+## Real-World Usage
+- Used in multiple pharmacy stores
+- Supports audit preparation
+- Helps identify loss-making drugs
+- Improves purchasing decisions
