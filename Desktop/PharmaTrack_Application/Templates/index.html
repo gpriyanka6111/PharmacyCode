@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PharmaTrack — Report Runner</title>
+
+  <!-- Google Font: DM Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Bootstrap 5 + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --brand: #0f4c81;
+      --brand-light: #1a6bb5;
+      --brand-soft: #e8f2ff;
+      --accent: #00c48c;
+      --bg: #f7f9fc;
+      --border: #e2e8f0;
+      --ink: #1a202c;
+      --muted: #64748b;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      color: var(--ink);
+      transition: background-color .3s, color .3s;
+    }
+
+    /* 🌙 Dark mode */
+    .dark-mode { background: #121212; color: #eee; }
+    .dark-mode .step-card { background: #1e1e1e; border-color: #333; color: #ddd; }
+    .dark-mode .pt-navbar { background: #1a1a1a; border-color: #333; }
+
+    /* ── Navbar ── */
+    .pt-navbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 0;
+      position: sticky;
+      top: 0;
+      z-index: 1050;
+    }
+    .pt-logo-box {
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: inline-grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .pt-brand-name { font-weight: 600; font-size: 1.05rem; color: var(--ink); line-height: 1.15; }
+    .pt-brand-sub  { font-size: 0.72rem; color: var(--muted); }
+    .pt-support-link { font-size: 0.82rem; color: var(--muted); }
+    .pt-support-link a { color: var(--brand); text-decoration: none; font-weight: 500; }
+    .pt-support-link a:hover { text-decoration: underline; }
+
+    /* ── Step progress indicator ── */
+    .step-progress { display: flex; align-items: center; margin-bottom: 28px; }
+    .sp-item { display: flex; align-items: center; gap: 8px; }
+    .sp-circle {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 2px solid var(--border); background: #fff;
+      display: inline-grid; place-items: center;
+      font-size: 0.8rem; font-weight: 600; color: var(--muted);
+      flex-shrink: 0; transition: 0.2s all;
+    }
+    .sp-circle.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .sp-circle.done   { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .sp-label { font-size: 0.82rem; color: var(--muted); font-weight: 500; white-space: nowrap; }
+    .sp-label.active  { color: var(--brand); font-weight: 600; }
+    .sp-line  { flex: 1; height: 2px; background: var(--border); margin: 0 10px; }
+
+    /* ── Page title ── */
+    .page-title { text-align: center; margin-bottom: 32px; }
+    .page-title h2 { font-size: 1.9rem; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+    .page-title p  { color: var(--muted); font-size: 0.95rem; }
+
+    /* ── Cards ── */
+    .step-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(15, 76, 129, 0.06);
+      background: #fff;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .brand-gradient { background: var(--brand); color: #fff; }
+    .badge-step {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: inline-grid; place-items: center;
+      background: var(--brand); color: #fff;
+    }
+    .muted { color: var(--muted); }
+
+    /* ── Form controls ── */
+    .form-control:focus, .form-select:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(15, 76, 129, 0.1);
+    }
+    .form-label { font-weight: 500; font-size: 0.88rem; color: #374151; margin-bottom: 6px; }
+
+    /* ── Dropzones ── */
+    .uploader input[type=file] { display: none; }
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      padding: 20px 16px;
+      text-align: center;
+      transition: 0.2s all;
+      background: #fafbfd;
+      cursor: pointer;
+    }
+    .dropzone:hover { border-color: var(--brand); background: var(--brand-soft); }
+    .dropzone.dragover { border-color: var(--brand); background: var(--brand-soft); }
+    .dropzone .dz-icon { font-size: 1.6rem; color: var(--brand); margin-bottom: 6px; display: block; }
+    .dropzone .dz-text { font-size: 0.85rem; color: var(--ink); font-weight: 500; display: block; }
+    .dropzone .dz-hint { font-size: 0.75rem; color: var(--muted); display: block; margin-top: 2px; }
+    .dz-badge {
+      display: inline-block;
+      font-size: 0.68rem; font-weight: 600; letter-spacing: 0.03em;
+      padding: 2px 8px; border-radius: 20px; margin-top: 7px;
+    }
+    .dz-badge-required { background: #fee2e2; color: #b91c1c; }
+    .dz-badge-optional  { background: #fef3c7; color: #92400e; }
+
+    /* ── Buttons ── */
+    .btn-primary {
+      background-color: var(--brand) !important;
+      border-color: var(--brand) !important;
+      font-weight: 500;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--brand-light) !important;
+      border-color: var(--brand-light) !important;
+    }
+    .btn-outline-secondary { color: var(--muted); border-color: var(--border); }
+    .btn-outline-secondary:hover { background-color: #f1f5f9; border-color: #c8d6e5; color: var(--ink); }
+
+    /* ── Progress bar (hidden, kept for JS) ── */
+    .progress-thin .progress-bar { height: 6px; border-radius: 6px; background-color: var(--brand) !important; }
+    #progressLabel { display: none; }
+
+    /* ── Toast ── */
+    .toast-success { background-color: #28a745 !important; }
+
+    /* ── Footer ── */
+    .app-footer {
+      position: fixed; bottom: 0; width: 100%;
+      text-align: center; font-size: 13px; color: #6c757d;
+      background: rgba(255,255,255,0.92); padding: 6px 0;
+      border-top: 1px solid var(--border); z-index: 1000;
+    }
+    .footer-note { font-size: .88rem; }
+  </style>
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="pt-navbar">
+    <div class="container d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <span class="pt-logo-box">Rx</span>
+        <div>
+          <div class="pt-brand-name">PharmaTrack</div>
+          <div class="pt-brand-sub">Pharmacy profit intelligence</div>
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <span class="pt-support-link d-none d-sm-inline">
+          Need help? <a href="mailto:support@pharmatrack.com">support@pharmatrack.com</a>
+        </span>
+        <button id="btnStart" class="btn btn-sm"
+          style="background:var(--brand-soft);color:var(--brand);font-weight:500;border:1px solid #c3d9f5;">
+          <i class="bi bi-arrow-repeat me-1"></i>New Report
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container pb-5 pt-4">
+
+    <!-- Step progress indicator -->
+    <div class="step-progress">
+      <div class="sp-item">
+        <span class="sp-circle active" id="spCircle1">1</span>
+        <span class="sp-label active" id="spLabel1">Upload files</span>
+      </div>
+      <div class="sp-line"></div>
+      <div class="sp-item">
+        <span class="sp-circle" id="spCircle2">2</span>
+        <span class="sp-label" id="spLabel2">Review summary</span>
+      </div>
+      <div class="sp-line"></div>
+      <div class="sp-item">
+        <span class="sp-circle" id="spCircle3">3</span>
+        <span class="sp-label" id="spLabel3">Download report</span>
+      </div>
+    </div>
+
+    <!-- Page title -->
+    <div class="page-title">
+      <h2>Upload your pharmacy data</h2>
+      <p>We’ll analyze your billing vs purchasing data and show you exactly where you’re losing money</p>
+    </div>
+
+    <!-- Hidden progress elements kept for JS compatibility -->
+    <div style="display:none;">
+      <span id="progressLabel">Step 1 of 4</span>
+      <div class="progress progress-thin" style="height:6px;">
+        <div id="progressBar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <div class="row justify-content-center">
+      <div class="col-xl-10">
+
+        <!-- STEP 1: Upload -->
+        <section id="step1" class="step-card card p-4 mb-4">
+          <div class="d-flex align-items-center mb-3">
+            <span class="badge-step brand-gradient me-3"><i class="bi bi-1-circle"></i></span>
+            <div>
+              <h5 class="mb-0">Upload your data</h5>
+              <small class="muted">Custom Log, ALL PBM, BIN Master, Kinray & optional vendors</small>
+            </div>
+          </div>
+
+          <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Pharmacy Name</label>
+                <input class="form-control" name="pharmacy_name" required>
+                <div class="invalid-feedback">Please enter a pharmacy name.</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Date Range</label>
+                <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:end">
+                  <div>
+                    <label class="form-label" style="font-size:12px">From</label>
+                    <select class="form-control" id="from_month" name="from_month" required onchange="updateDateRange()">
+                      <option value="">Select month</option>
+                    </select>
+                  </div>
+                  <div style="padding-bottom:10px;color:var(--ink-3);text-align:center">→</div>
+                  <div>
+                    <label class="form-label" style="font-size:12px">To</label>
+                    <select class="form-control" id="to_month" name="to_month" required onchange="updateDateRange()">
+                      <option value="">Select month</option>
+                    </select>
+                  </div>
+                </div>
+                <!-- Hidden field that sends formatted date range to Flask -->
+                <input type="hidden" id="date_range" name="date_range" value="">
+                <!-- Summary shown below selectors -->
+                <div id="date_summary" style="font-size:12px;color:var(--ink-3);margin-top:6px;min-height:18px"></div>
+                <div class="invalid-feedback">Please select a date range.</div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">BestRx — Custom Log (CSV)</label>
+                <div class="uploader">
+                  <label class="dropzone w-100" data-for="custom_log">
+                    <i class="bi bi-filetype-csv dz-icon"></i>
+                    <span class="dz-text">Drag & drop or click to upload</span>
+                    <span class="dz-hint">.csv files only</span>
+                    <span class="dz-badge dz-badge-required">Required</span>
+                  </label>
+                  <input type="file" id="custom_log" name="custom_log" accept=".csv" required>
+                </div>
+                <div class="invalid-feedback d-block" data-feedback-for="custom_log"></div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">BestRx — ALL PBM (CSV)</label>
+                <div class="uploader">
+                  <label class="dropzone w-100" data-for="all_pbm">
+                    <i class="bi bi-file-earmark-spreadsheet dz-icon"></i>
+                    <span class="dz-text">Drag & drop or click to upload</span>
+                    <span class="dz-hint">.csv files only</span>
+                    <span class="dz-badge dz-badge-optional">Optional</span>
+                  </label>
+                  <input type="file" id="all_pbm" name="all_pbm" accept=".csv" required>
+                </div>
+                <div class="invalid-feedback d-block" data-feedback-for="all_pbm"></div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">BIN Master (CSV)</label>
+                <div class="uploader">
+                  <label class="dropzone w-100" data-for="bin_master">
+                    <i class="bi bi-clipboard-data dz-icon"></i>
+                    <span class="dz-text">Drag & drop or click to upload</span>
+                    <span class="dz-hint">.csv files only</span>
+                    <span class="dz-badge dz-badge-required">Required</span>
+                  </label>
+                  <input type="file" id="bin_master" name="bin_master" accept=".csv" required>
+                </div>
+                <div class="invalid-feedback d-block" data-feedback-for="bin_master"></div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">KINRAY (CSV) -> date, ndc, shipped, invoice </label>
+                <div class="uploader">
+                  <label class="dropzone w-100" data-for="kinray_file">
+                    <i class="bi bi-filetype-csv dz-icon"></i>
+                    <span class="dz-text">Drag & drop or click to upload</span>
+                    <span class="dz-hint">.csv files only</span>
+                    <span class="dz-badge dz-badge-required">Required</span>
+                  </label>
+                  <input type="file" id="kinray_file" name="kinray_file" accept=".csv" required>
+                </div>
+                <div class="invalid-feedback d-block" data-feedback-for="kinray_file"></div>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Additional Vendors (excluding Kinray) -> ndc, shipped, invoice</label>
+                <div class="input-group">
+                  <span class="input-group-text"><i class="bi bi-people"></i></span>
+                  <input type="number" id="vendor_count" name="vendor_count" class="form-control" min="0" value="0">
+                </div>
+                <small class="text-secondary">Choose how many extra vendor files you want to add.</small>
+              </div>
+
+              <div id="vendor_inputs" class="col-12"></div>
+
+              <div class="col-12 text-end">
+                <button type="button" class="btn btn-outline-secondary" id="toStep2">
+                  Next: Output options <i class="bi bi-arrow-right-short"></i>
+                </button>
+              </div>
+            </div>
+          </form>
+        </section>
+
+        <!-- STEP 2: Output opt-in -->
+        <section id="step2" class="step-card card p-4 mb-4 d-none">
+          <div class="d-flex align-items-center mb-3">
+            <span class="badge-step brand-gradient me-3"><i class="bi bi-2-circle"></i></span>
+            <div>
+              <h5 class="mb-0">You ready for output?</h5>
+              <small class="muted">Confirm and run your report</small>
+            </div>
+          </div>
+
+          <!-- ✅ Downloads go here -->
+          <div id="downloadLinks" class="mt-3"></div>
+
+          <div class="card border-0 shadow-sm p-4 mb-3" style="background: linear-gradient(135deg, #f8f9fa 0%, #f0f6ff 100%);">
+            <div class="mb-4">
+              <h6 class="fw-bold mb-1"><i class="bi bi-file-earmark-check text-primary me-2"></i>Generate Excel Report</h6>
+              <small class="text-muted">We'll process your files and prepare the download.</small>
+            </div>
+            <div class="row g-3">
+              <!-- Main Report Folder -->
+              <div class="col-12">
+                <label class="form-label fw-500 mb-2"><i class="bi bi-file-earmark-excel text-success me-2"></i>Main Report Destination <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <input id="mainSaveDir" class="form-control border-success-subtle" placeholder="Select folder to save main report" aria-label="Main report folder" required>
+                  <button id="btnBrowseMainDir" type="button" class="btn btn-outline-success">
+                    <i class="bi bi-folder-check me-2"></i>Browse
+                  </button>
+                </div>
+                <small class="text-muted d-block mt-1"><i class="bi bi-info-circle me-1"></i>File will be copied here after generation</small>
+                <div class="invalid-feedback d-block" id="mainSaveDirFeedback"></div>
+              </div>
+              
+              <!-- Audit Workbook Folder -->
+              <div class="col-12">
+                <label class="form-label fw-500 mb-2"><i class="bi bi-file-earmark-text text-info me-2"></i>Audit Workbook Destination <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <input id="auditSaveDir" class="form-control border-info-subtle" placeholder="Select folder to save audit workbook" aria-label="Audit folder" required>
+                  <button id="btnBrowseAuditDir" type="button" class="btn btn-outline-info">
+                    <i class="bi bi-folder-check me-2"></i>Browse
+                  </button>
+                </div>
+                <small class="text-muted d-block mt-1"><i class="bi bi-info-circle me-1"></i>Audit file will be copied here if generated</small>
+                <div class="invalid-feedback d-block" id="auditSaveDirFeedback"></div>
+              </div>
+
+              <!-- Ready Toggle -->
+              <div class="col-12">
+                <div class="d-flex align-items-center justify-content-between pt-3 border-top">
+                  <span class="text-secondary small">Confirm you're ready to proceed</span>
+                  <div class="form-check form-switch m-0">
+                    <input class="form-check-input" type="checkbox" id="readySwitch" style="width: 3.5rem; height: 1.75rem;">
+                    <label class="form-check-label fw-medium ms-2" for="readySwitch">I'm ready</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3 text-end">
+            <button class="btn btn-outline-secondary me-2" id="backTo1">
+              <i class="bi bi-arrow-left-short"></i> Back
+            </button>
+            <button class="btn btn-primary" id="btnRun" disabled>
+              <i class="bi bi-gear-fill me-1"></i> Run Report
+            </button>
+          </div>
+        </section>
+        <!-- REVIEW MODAL (Bootstrap) -->
+        <div class="modal fade" id="reviewModal" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Review & Generate Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+
+              <div class="modal-body">
+                <div id="reviewSummary" class="summary"></div>
+                <hr/>
+                <h6>Insurance processors to include</h6>
+                <div id="processorChoices" class="d-flex flex-wrap gap-3 mb-3"></div>
+                <h6 class="d-flex align-items-center justify-content-between">
+                  Sheets to include
+                  <span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="btnSelectAll">Select all</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnClearAll">Clear</button>
+                  </span>
+                </h6>
+                <small class="text-muted d-block mb-2">
+                  Select one or more sheets to include in the final Excel report. 
+                  <strong>If none are selected, all sheets will be kept.</strong>
+                </small>
+                <div id="sheetChoices" class="d-grid gap-2">
+                  <label><input type="checkbox" value="Processed Data" checked> Processed Data (required)</label>
+                  <label><input type="checkbox" value="BIN to Processor" checked> BIN to Processor (required)</label>
+                  <label><input type="checkbox" value="Needs to be ordered - All" checked> Needs to be ordered - All</label>
+                  <label><input type="checkbox" value="Do Not Order - ALL" checked> Do Not Order - ALL</label>
+                  <label><input type="checkbox" value="Never Ordered - Check" checked> Never Ordered - Check</label>
+                  <label><input type="checkbox" value="RX Comparison - All" checked> RX Comparison - All</label>
+                  <label><input type="checkbox" value="RX Comparison +ve" checked> RX Comparison +ve</label>
+                  <label><input type="checkbox" value="MFP Drugs - RX" checked> MFP Drugs - RX</label>
+                </div>
+              </div>
+
+              <div class="modal-footer">
+                <button id="cancelReview" type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button id="confirmGenerate" type="button" class="btn btn-primary">Generate & Download</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 4: Done (no download button) -->
+        <section id="step3" class="step-card card p-4 mb-4 d-none">
+          <h5><span class="badge bg-primary me-2">3</span> Report Ready 🎯</h5>
+
+          <p class="mb-2">✅ Your report is saved in your <strong>Downloads</strong> folder.</p>
+          <p>Would you like to email it?</p>
+
+          <div class="d-flex justify-content-end gap-2">
+            <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#emailModal">
+              <i class="bi bi-envelope"></i> Email
+            </button>
+            <button id="btnFinish" class="btn btn-success">
+              <i class="bi bi-check2-circle"></i> Finish
+            </button>
+          </div>
+        </section>
+
+        <!-- STEP 4: Thank You -->
+        <section id="step4" class="step-card card p-4 d-none text-center">
+          <h4>All set 🎉</h4>
+          <p>Have a wonderful day!</p>
+        </section>
+
+        </div>
+        </div>
+        </main>
+
+
+  <!-- Email Modal -->
+  <div class="modal fade" id="emailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form id="emailForm" class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-envelope-paper-heart me-2"></i>Email Report</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Sender Email -->
+          <div class="mb-3">
+            <label for="senderEmail" class="form-label">From</label>
+            <input type="email" class="form-control" id="senderEmail"name="from_email" placeholder="yourname@example.com" required>          </div>
+          <div class="mb-3">
+            <label class="form-label">Recipient Email</label>
+            <input type="email" class="form-control" name="to_email" placeholder="name@example.com" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Message (optional)</label>
+            <textarea class="form-control" name="message" rows="3" placeholder="Here’s your PharmaTrack report…"></textarea>
+          </div>
+          <small class="text-secondary">We’ll attach the most recent generated file.</small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-send"></i> Send
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
+    <div id="liveToast" class="toast align-items-center text-bg-success border-0" role="alert">
+      <div class="d-flex">
+        <div class="toast-body">
+          <i class="bi bi-check2-circle me-2"></i><span id="toastMsg">Done</span>
+        </div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+
+<script>
+// =============== Utilities & One-time setup ===============
+(function injectConfetti(){
+  // Load canvas-confetti if missing
+  if (!window.confetti) {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
+    s.defer = true;
+    document.head.appendChild(s);
+  }
+})();
+
+// Typing Effect for greeting (optional: needs an element with id="introText")
+function typeEffect(el, text, speed=70) {
+  if (!el) return;
+  let i = 0;
+  const t = setInterval(() => {
+    el.textContent += text.charAt(i++);
+    if (i >= text.length) clearInterval(t);
+  }, speed);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  typeEffect(document.getElementById('introText'),
+    "Hi there 👋 Welcome to PharmaTrack — your audit companion 💊");
+});
+
+// Simple dark mode toggle button
+(function addDarkMode(){
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-sm btn-outline-secondary position-fixed top-0 end-0 m-3';
+  btn.style.zIndex = 1081;
+  btn.title = 'Toggle dark mode';
+  btn.innerHTML = '<i class="bi bi-moon"></i>';
+  btn.onclick = () => {
+    document.body.classList.toggle('dark-mode');
+    btn.innerHTML = document.body.classList.contains('dark-mode')
+      ? '<i class="bi bi-sun"></i>' : '<i class="bi bi-moon"></i>';
+  };
+  document.body.appendChild(btn);
+})();
+
+console.log("%cWelcome, data wizard! 🧙‍♀️", "color:#6c63ff;font-size:16px;font-weight:bold;");
+
+// =============== Step navigation & progress ===============
+const steps = ["step1","step2","step3","step4"];
+let currentStep = 0;
+const progressBar   = document.getElementById('progressBar');
+const progressLabel = document.getElementById('progressLabel');
+
+const funPhrases = [
+  "🚀 Uploading your magic ingredients",
+  "🧠 Crunching the numbers",
+  "📊 Brewing your report",
+  "🎯 Done and dusted!"
+];
+
+function showStep(i){
+  currentStep = i;
+  steps.forEach((id, idx) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('d-none', idx !== i);
+  });
+  const percent = ((i) / (steps.length - 1)) * 100;
+  if (progressBar)   progressBar.style.width = percent + "%";
+  if (progressLabel) progressLabel.textContent = funPhrases[i] || `Step ${i+1} of ${steps.length}`;
+  if (i === 3) celebrate();
+}
+showStep(0);
+
+document.getElementById('btnStart')?.addEventListener('click', (e) => {
+  e.preventDefault();
+  resetWizard();   // clears previous files/inputs and shows Step 1
+});
+
+
+// =============== Dynamic vendor inputs ===============
+(function () {
+  const vendorCountInput = document.getElementById('vendor_count');
+  const vendorInputsDiv  = document.getElementById('vendor_inputs');
+
+  function renderVendors(n) {
+    vendorInputsDiv.innerHTML = '';
+    for (let i = 1; i <= n; i++) {
+      const block = document.createElement('div');
+      block.className = "row g-2 align-items-end mb-3";
+      block.innerHTML = `
+        <div class="col-md-4">
+          <label class="form-label">Vendor Name ${i}</label>
+          <input class="form-control" name="vendor${i}_name" placeholder="e.g., McKesson" required>
+        </div>
+        <div class="col-md-8">
+          <label class="form-label">Vendor File ${i} (CSV)</label>
+          <input type="file" class="form-control" name="vendor${i}_file" accept=".csv" required>
+        </div>
+      `;
+      vendorInputsDiv.appendChild(block);
+    }
+  }
+
+  vendorCountInput?.addEventListener('change', () => {
+    const n = Math.max(0, parseInt(vendorCountInput.value || '0', 10) || 0);
+    vendorCountInput.value = n;
+    renderVendors(n);
+  });
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const n = Math.max(0, parseInt(vendorCountInput?.value || '0', 10) || 0);
+    renderVendors(n);
+  });
+})();
+
+// =============== Drag & drop upload UX ===============
+document.querySelectorAll('.dropzone').forEach(z => {
+  const forId = z.getAttribute('data-for');
+  const input = document.getElementById(forId);
+  if (!input) return;
+
+  z.addEventListener('click', () => input.click());
+  z.addEventListener('dragover', e => { e.preventDefault(); z.classList.add('dragover'); });
+  z.addEventListener('dragleave', () => z.classList.remove('dragover'));
+  z.addEventListener('drop', e => {
+    e.preventDefault(); z.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+      input.files = e.dataTransfer.files;
+      const span = z.querySelector('span');
+      if (span) span.textContent = e.dataTransfer.files[0].name;
+    }
+  });
+  input.addEventListener('change', () => {
+    if (input.files && input.files.length) {
+      const span = z.querySelector('span');
+      if (span) span.textContent = input.files[0].name;
+    }
+  });
+});
+
+// =============== Validation ===============
+const uploadForm = document.getElementById('uploadForm');
+function validateUpload() {
+  uploadForm.classList.add('was-validated');
+  if (!uploadForm.checkValidity()) return false;
+uploadForm.addEventListener('submit', (e) => e.preventDefault());
+
+  // Required inputs must exist & have file
+  const reqIds = ['custom_log','all_pbm','bin_master','kinray_file'];
+  for (const id of reqIds) {
+    const input = document.getElementById(id);
+    const fb = document.querySelector(`[data-feedback-for="${id}"]`);
+    if (!input || !input.files || !input.files.length) {
+      if (fb) fb.textContent = 'Please select a file.';
+      return false;
+    } else if (fb) {
+      fb.textContent = '';
+    }
+  }
+  return true;
+}
+
+// Step buttons
+document.getElementById('toStep2')?.addEventListener('click', () => {
+  if (validateUpload()) showStep(1);
+});
+document.getElementById('backTo1')?.addEventListener('click', () => showStep(0));
+
+// Enable Run when ready toggled AND folders are selected
+const readySwitch = document.getElementById('readySwitch');
+const btnRun      = document.getElementById('btnRun');
+const mainSaveDir = document.getElementById('mainSaveDir');
+const auditSaveDir = document.getElementById('auditSaveDir');
+
+function validateFolderSelection() {
+  const mainPath = mainSaveDir?.value?.trim() || '';
+  const auditPath = auditSaveDir?.value?.trim() || '';
+  
+  let isValid = true;
+  
+  if (!mainPath) {
+    if (mainSaveDir) mainSaveDir.classList.add('is-invalid');
+    const fb = document.getElementById('mainSaveDirFeedback');
+    if (fb) fb.textContent = 'Please select a folder for the main report.';
+    isValid = false;
+  } else {
+    if (mainSaveDir) mainSaveDir.classList.remove('is-invalid');
+    const fb = document.getElementById('mainSaveDirFeedback');
+    if (fb) fb.textContent = '';
+  }
+  
+  if (!auditPath) {
+    if (auditSaveDir) auditSaveDir.classList.add('is-invalid');
+    const fb = document.getElementById('auditSaveDirFeedback');
+    if (fb) fb.textContent = 'Please select a folder for the audit workbook.';
+    isValid = false;
+  } else {
+    if (auditSaveDir) auditSaveDir.classList.remove('is-invalid');
+    const fb = document.getElementById('auditSaveDirFeedback');
+    if (fb) fb.textContent = '';
+  }
+  
+  return isValid;
+}
+
+function updateRunButtonState() {
+  const isReady = readySwitch?.checked || false;
+  const foldersValid = validateFolderSelection();
+  if (btnRun) btnRun.disabled = !(isReady && foldersValid);
+}
+
+readySwitch?.addEventListener('change', updateRunButtonState);
+mainSaveDir?.addEventListener('change', updateRunButtonState);
+mainSaveDir?.addEventListener('blur', updateRunButtonState);
+auditSaveDir?.addEventListener('change', updateRunButtonState);
+auditSaveDir?.addEventListener('blur', updateRunButtonState);
+
+// =============== Toast helper ===============
+function toast(msg){
+  const fallbacks = [
+    "Report cooked to perfection 👩‍🍳",
+    "Data magic complete ✨",
+    "All systems go 🚀",
+    "Excel-lent! 📈"
+  ];
+  const text = msg || fallbacks[Math.floor(Math.random() * fallbacks.length)];
+  const bodyEl = document.getElementById('toastMsg');
+  if (bodyEl) bodyEl.textContent = text;
+  const t = new bootstrap.Toast(document.getElementById('liveToast'), { delay: 2500 });
+  t.show();
+}
+
+// =============== Confetti celebration ===============
+document.getElementById('btnFinish')?.addEventListener('click', () => {
+  celebrate();
+  toast("All done! 🎉 Have a great day 😊");
+  showStep(3); // Goes to your thank-you section
+});
+// Optional: auto-finish after clicking Download
+document.getElementById('downloadLink')?.addEventListener('click', () => {
+  setTimeout(() => showStep(3), 300);
+});
+
+function celebrate() {
+  if (!window.confetti) return;
+  const duration = 1500;
+  const end = Date.now() + duration;
+  (function frame(){
+    confetti({ particleCount: 6, spread: 60, origin: { y: 0.7 }});
+    if (Date.now() < end) requestAnimationFrame(frame);
+  })();
+}
+
+
+let CURRENT_JOB_ID = null;
+
+async function postJSON(url, payload) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+let reviewModalInstance = null;
+
+function showReviewModal(summary) {
+  const summaryDiv = document.getElementById('reviewSummary');
+  const fmt = n => Number(n).toLocaleString('en-US');
+
+  let html = `<p><b>Total Rx for your pharmacy:</b> ${fmt(summary.total_rx)}</p>`;
+  html += `<h6 class="mt-3">Insurance (Processor) overview</h6><ul class="mb-2">`;
+  (summary.by_processor || []).forEach(p => {
+    const totalPaid = Number(p.total_paid || 0).toFixed(2);
+    html += `<li><b>${p.processor}</b>: ${fmt(p.rx_count)} RX &nbsp;|&nbsp; $${fmt(totalPaid)}</li>`;
+  });
+  html += `</ul>`;
+  // --- Unmapped BINs section ---
+  if (Array.isArray(summary.unmapped_bins) && summary.unmapped_bins.length) {
+    const totalBins = Number(summary.unmapped_total_bins || summary.unmapped_bins.length);
+    const totalRx   = Number(summary.unmapped_total_rx || 0);
+
+    html += `
+      <h6 class="mt-3 text-danger">Unmapped BINs</h6>
+      <p class="small text-muted mb-1">
+        ${fmt(totalBins)} BIN(s) with ${fmt(totalRx)} RX not mapped to any processor.
+        <b>Update the BIN Master file</b> to map these.
+      </p>
+      <ul class="mb-2">
+    `;
+
+    (summary.unmapped_bins.slice(0, 20)).forEach(b => {
+      html += `<li><code>${b.bin}</code>: ${fmt(b.rx_count)} RX</li>`;
+    });
+
+    const extra = summary.unmapped_bins.length - 20;
+    if (extra > 0) {
+      html += `<li>…and ${fmt(extra)} more BIN(s)</li>`;
+    }
+    html += `</ul>`;
+  }
+
+  // now inject everything into modal
+  summaryDiv.innerHTML = html;
+
+
+
+  // ✅ processors checklist (FRONTEND)
+  const procWrap = document.getElementById('processorChoices');
+  procWrap.innerHTML = ''; // reset
+
+  // Get processors from the server-provided summary
+  const procs = Array.isArray(summary.processors)
+    ? [...new Set(summary.processors)].filter(Boolean)
+    : [];
+
+  // “Select all” quick toggle
+  if (procs.length) {
+    const allId = 'proc_all';
+    procWrap.insertAdjacentHTML('beforeend', `
+      <label class="form-check">
+        <input type="checkbox" id="${allId}" class="form-check-input" checked>
+        <span class="form-check-label fw-medium">Select all</span>
+      </label>
+    `);
+
+    procs.forEach((name, i) => {
+      const id = `proc_${i}`;
+      procWrap.insertAdjacentHTML('beforeend', `
+        <label class="form-check">
+          <input
+            type="checkbox"
+            class="form-check-input proc-item"
+            id="${id}"
+            value="${name}"
+            data-proc="${name}"
+            checked
+          >
+          <span class="form-check-label">${name}</span>
+        </label>
+      `);
+    });
+
+    // Wire select-all
+    const all = document.getElementById(allId);
+    all.addEventListener('change', () => {
+      procWrap.querySelectorAll('.proc-item').forEach(cb => cb.checked = all.checked);
+    });
+
+    // Keep select-all in sync when individual items change
+    procWrap.addEventListener('change', (e) => {
+      if (!e.target.classList.contains('proc-item')) return;
+      const items = procWrap.querySelectorAll('.proc-item');
+      const checked = procWrap.querySelectorAll('.proc-item:checked');
+      all.checked = (items.length === checked.length);
+    });
+
+  } else {
+    procWrap.textContent = 'No processors detected from the upload.';
+  }
+
+
+  const el = document.getElementById('reviewModal');
+  reviewModalInstance = reviewModalInstance || new bootstrap.Modal(el, { backdrop: 'static' });
+  reviewModalInstance.show();
+  // ✅ add this block right below
+  procWrap.addEventListener('change', (e) => {
+    if (!e.target.classList.contains('proc-item')) return;
+    const items = procWrap.querySelectorAll('.proc-item');
+    const checked = procWrap.querySelectorAll('.proc-item:checked');
+    document.getElementById('proc_all').checked = (items.length === checked.length);
+  });
+}
+
+
+function hideReviewModal() {
+  reviewModalInstance?.hide();
+}
+// === Replace your entire "Wire the existing upload form" block with this ===
+document.addEventListener('DOMContentLoaded', () => {
+  const uploadForm  = document.getElementById('uploadForm');
+  const btnRun      = document.getElementById('btnRun');
+  const btnCancel   = document.getElementById('cancelReview');
+  const btnConfirm  = document.getElementById('confirmGenerate');
+
+  // Close review modal
+  btnCancel?.addEventListener('click', hideReviewModal);
+
+  // Run → upload → show review modal
+  btnRun?.addEventListener('click', async (e) => {
+    e.preventDefault();
+
+    if (!validateUpload()) {
+      showStep(0);
+      return;
+    }
+
+    btnRun.disabled = true;
+
+    const emojis = ['💊','🧪','🧬','💉','🩺'];
+    let i = 0;
+    const spin = setInterval(() => {
+      btnRun.innerHTML = `<span class="me-2">${emojis[i]}</span>Running…`;
+      i = (i + 1) % emojis.length;
+    }, 500);
+
+    try {
+      const fd  = new FormData(uploadForm);
+      const res = await fetch('/upload', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Upload failed');
+      }
+
+      CURRENT_JOB_ID = data.job_id;
+      showReviewModal(data.summary);
+
+    } catch (err) {
+      alert(`Unexpected error: ${err?.message || err}`);
+      console.error(err);
+    } finally {
+      clearInterval(spin);
+      btnRun.disabled = false;
+      btnRun.innerHTML = '<i class="bi bi-gear-fill me-1"></i> Run Report';
+    }
+    });
+});
+// --- NEW: review confirm → finalize → show both download links ---
+document.addEventListener('DOMContentLoaded', () => {
+  const btnConfirm = document.getElementById('confirmGenerate');
+  if (!btnConfirm) return;
+
+  btnConfirm.addEventListener('click', async (e) => {
+    e.preventDefault();
+
+    // Validate folder selections first
+    if (!validateFolderSelection()) {
+      alert('Please select both main report and audit workbook destinations.');
+      return;
+    }
+
+    // guard: avoid double-clicks
+    if (btnConfirm.dataset.busy === '1') return;
+    btnConfirm.dataset.busy = '1';
+    btnConfirm.disabled = true;
+
+    try {
+      if (!CURRENT_JOB_ID) throw new Error('Missing job id');
+
+      const selected_sheets = Array.from(
+        document.querySelectorAll('#sheetChoices input[type="checkbox"]:checked')
+      ).map(cb => cb.value);
+
+      const selected_processors = getSelectedProcessors();
+
+      // include main_save_dir and audit_save_dir (now required)
+      const mainSaveDir = document.getElementById('mainSaveDir')?.value || null;
+      const auditSaveDir = document.getElementById('auditSaveDir')?.value || null;
+      const res = await fetch('/finalize', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          job_id: CURRENT_JOB_ID,
+          selected_sheets,
+          selected_processors,
+          main_save_dir: mainSaveDir,
+          audit_save_dir: auditSaveDir
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Finalize failed');
+      }
+
+      // ✅ close modal
+      hideReviewModal?.();
+
+      // ✅ insert the two download buttons into Step 2
+      const linksDiv = document.getElementById('downloadLinks');
+      if (linksDiv) {
+        linksDiv.innerHTML = `
+          <a href="${data.main_download_url}" class="btn btn-primary me-2">
+            Download Main Report
+          </a>
+          ${data.audit_download_url ? `\
+          <a href="${data.audit_download_url}" class="btn btn-outline-primary">\
+            Download Audit Workbook\
+          </a>\
+          ` : ''}
+        `;
+      }
+
+      toast?.('Report ready!');
+      if (data.dashboard_url) {
+        window.location.href = data.dashboard_url;
+      } else {
+        showStep?.(2);           // fallback: show Step 2 with download buttons
+      }
+
+    } catch (err) {
+      alert(`Finalize error: ${err.message || err}`);
+      console.error(err);
+    } finally {
+      btnConfirm.disabled = false;
+      btnConfirm.dataset.busy = '0';
+    }
+  });
+});
+
+// Wire Browse buttons to open server-side folder picker
+document.getElementById('btnBrowseMainDir')?.addEventListener('click', async () => {
+  try {
+    const res = await fetch('/pick_folder');
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'Folder selection cancelled');
+    }
+    const inp = document.getElementById('mainSaveDir');
+    if (inp) inp.value = data.path;
+  } catch (err) {
+    alert(`Folder picker error: ${err.message || err}`);
+  }
+});
+
+document.getElementById('btnBrowseAuditDir')?.addEventListener('click', async () => {
+  try {
+    const res = await fetch('/pick_folder');
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'Folder selection cancelled');
+    }
+    const inp = document.getElementById('auditSaveDir');
+    if (inp) inp.value = data.path;
+  } catch (err) {
+    alert(`Folder picker error: ${err.message || err}`);
+  }
+});
+
+function getSelectedProcessors() {
+        // read only real processor checkboxes, not the "Select all"
+        const items = document.querySelectorAll('#processorChoices .proc-item');
+        const checked = document.querySelectorAll('#processorChoices .proc-item:checked');
+        const values = Array.from(checked).map(cb => cb.value);
+        return (values.length === items.length) ? [] : values;
+      }
+
+// The older single-download finalize handler was removed in favor of
+// the newer handler above that shows both the main and audit download links.
+
+// =============== Email modal (optional) ===============
+const emailForm = document.getElementById('emailForm');
+emailForm?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(emailForm);
+  if (typeof CURRENT_JOB_ID === 'string' && CURRENT_JOB_ID.length) {
+    fd.append('job_id', CURRENT_JOB_ID);
+  }
+  try {
+    const res = await fetch('/email', { method: 'POST', body: fd });
+    if (!res.ok) throw new Error(await res.text());
+    toast('Email sent!');
+    const modal = bootstrap.Modal.getInstance(document.getElementById('emailModal'));
+    modal?.hide();
+    showStep(3);
+    setTimeout(() => showStep(4), 600);
+  } catch (err) {
+    console.error(err);
+    alert('Could not send the email. Please try again.');
+  }
+});
+function clearFileInput(input) {
+  if (!input) return;
+  const clone = input.cloneNode(true);
+  input.parentNode.replaceChild(clone, input);
+}
+
+function resetDropzoneLabel(forId, defaultText) {
+  const dz = document.querySelector(`.dropzone[data-for="${forId}"]`);
+  if (!dz) return;
+  const span = dz.querySelector('span');
+  if (span) span.textContent = defaultText;
+}
+
+function revokeDownloadURL() {
+  const a = document.getElementById('downloadLink');
+  if (a && a.href && a.href.startsWith('blob:')) {
+    URL.revokeObjectURL(a.href);
+    a.href = '#';
+    a.removeAttribute('download');
+  }
+}
+  const sheetChoicesEl = document.getElementById('sheetChoices');
+  document.getElementById('btnSelectAll').addEventListener('click', () => {
+    sheetChoicesEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+  });
+  document.getElementById('btnClearAll').addEventListener('click', () => {
+    sheetChoicesEl.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  });
+
+  // Helper to read selected sheets
+  function getSelectedSheets() {
+    return Array.from(sheetChoicesEl.querySelectorAll('input[type="checkbox"]'))
+      .filter(cb => cb.checked)
+      .map(cb => cb.value);
+  }
+
+
+function resetWizard() {
+  const uploadForm   = document.getElementById('uploadForm');
+
+  const vendorCount  = document.getElementById('vendor_count');
+  const vendorInputs = document.getElementById('vendor_inputs');
+  const readySwitch  = document.getElementById('readySwitch');
+  const btnRun       = document.getElementById('btnRun');
+
+  // Form + validation
+  uploadForm?.reset();
+  _populateMonthSelects();
+  uploadForm?.classList.remove('was-validated');
+
+  // Fully clear file inputs (replace nodes)
+  clearFileInput(document.getElementById('custom_log'));
+  clearFileInput(document.getElementById('all_pbm'));
+  clearFileInput(document.getElementById('bin_master'));   // only if you have this input
+  clearFileInput(document.getElementById('kinray_file'));
+
+  // Dynamic vendor fields
+  if (vendorCount) vendorCount.value = 0;
+  if (vendorInputs) vendorInputs.innerHTML = '';
+
+  // Toggle + Run button
+  if (readySwitch) readySwitch.checked = false;
+  if (btnRun) {
+    btnRun.disabled = true;
+    btnRun.innerHTML = '<i class="bi bi-gear-fill me-1"></i> Run Report';
+  }
+
+  // Dropzone label text back to default
+  resetDropzoneLabel('custom_log', 'Drag & drop or click to upload');
+  resetDropzoneLabel('all_pbm', 'Drag & drop or click to upload');
+  resetDropzoneLabel('kinray_file', 'Drag & drop or click to upload');
+  resetDropzoneLabel('bin_master', 'Drag & drop or click to upload'); // if present
+
+  // Clear helper texts & revoke prior blob URL
+  document.querySelectorAll('[data-feedback-for]').forEach(el => el.textContent = '');
+  revokeDownloadURL();
+
+  // Go to Step 1 and reset progress label
+  showStep(0);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+
+const _months = [
+  'January','February','March','April',
+  'May','June','July','August','September',
+  'October','November','December'
+];
+
+function _populateMonthSelects(){
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const years = [
+    currentYear-2,
+    currentYear-1,
+    currentYear,
+    currentYear+1
+  ];
+
+  ['from_month','to_month'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    sel.innerHTML = '<option value="">Select month</option>';
+    years.forEach(yr => {
+      _months.forEach((m, mi) => {
+        const val = `${yr}-${String(mi+1).padStart(2,'0')}`;
+        sel.innerHTML +=
+          `<option value="${val}">${m} ${yr}</option>`;
+      });
+    });
+  });
+
+  // Smart defaults: 13 months ago to last month
+  const defFrom = new Date(
+    now.getFullYear(),
+    now.getMonth()-13, 1
+  );
+  const defTo = new Date(
+    now.getFullYear(),
+    now.getMonth()-1, 1
+  );
+
+  const fromSel = document.getElementById('from_month');
+  const toSel = document.getElementById('to_month');
+
+  if(fromSel) fromSel.value =
+    `${defFrom.getFullYear()}-` +
+    `${String(defFrom.getMonth()+1).padStart(2,'0')}`;
+
+  if(toSel) toSel.value =
+    `${defTo.getFullYear()}-` +
+    `${String(defTo.getMonth()+1).padStart(2,'0')}`;
+
+  updateDateRange();
+}
+
+function updateDateRange(){
+  const fromVal = document.getElementById('from_month')?.value;
+  const toVal = document.getElementById('to_month')?.value;
+  const summary = document.getElementById('date_summary');
+  const hidden = document.getElementById('date_range');
+
+  if(!fromVal || !toVal){
+    if(summary) summary.textContent = '';
+    if(hidden) hidden.value = '';
+    return;
+  }
+
+  const [fy, fm] = fromVal.split('-').map(Number);
+  const [ty, tm] = toVal.split('-').map(Number);
+
+  // Validate end is after start
+  if(ty < fy || (ty===fy && tm<fm)){
+    if(summary){
+      summary.textContent =
+        'End month must be after start month';
+      summary.style.color = '#e53e3e';
+    }
+    if(hidden) hidden.value = '';
+    return;
+  }
+
+  // Calculate months count
+  const numMonths = (ty-fy)*12 + (tm-fm) + 1;
+
+  // Last day of end month
+  const lastDay = new Date(ty, tm, 0).getDate();
+
+  // Human readable labels
+  const fromLabel =
+    `${_months[fm-1]} 1, ${fy}`;
+  const toLabel =
+    `${_months[tm-1]} ${lastDay}, ${ty}`;
+
+  // Update summary text
+  if(summary){
+    summary.style.color = 'var(--ink-3)';
+    summary.textContent =
+      `${fromLabel} → ${toLabel} · ` +
+      `${numMonths} month${numMonths>1?'s':''}`;
+  }
+
+  // Update hidden field sent to Flask
+  // Format: "Dec 2024 - Dec 2025"
+  if(hidden){
+    hidden.value =
+      `${_months[fm-1].substring(0,3)} ${fy}` +
+      ` - ` +
+      `${_months[tm-1].substring(0,3)} ${ty}`;
+  }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+  _populateMonthSelects();
+});
+
+</script>
+<footer class="app-footer">
+  © <span id="year"></span> Developed by <strong>Priyanka Gulgari</strong>
+</footer>
+
+<script>
+  document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+</body>
+</html>

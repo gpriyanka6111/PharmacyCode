@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PharmaTrack — Dashboard</title>
+
+  <!-- Google Font: DM Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Bootstrap 5 + Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --brand: #0f4c81;
+      --brand-light: #1a6bb5;
+      --brand-soft: #e8f2ff;
+      --accent: #00c48c;
+      --bg: #f7f9fc;
+      --border: #e2e8f0;
+      --ink: #1a202c;
+      --muted: #64748b;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      color: var(--ink);
+      padding-bottom: 60px;
+    }
+
+    /* ── Navbar ── */
+    .pt-navbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 0;
+      position: sticky;
+      top: 0;
+      z-index: 1050;
+    }
+    .pt-logo-box {
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: inline-grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .pt-brand-name { font-weight: 600; font-size: 1.05rem; color: var(--ink); }
+    .pt-pharmacy-badge {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .pt-nav-btn {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--ink);
+      cursor: pointer;
+      transition: 0.15s all;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .pt-nav-btn:hover { background: var(--bg); border-color: #c3d9f5; color: var(--brand); }
+
+    /* ── Cards base ── */
+    .pt-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(15, 76, 129, 0.05);
+    }
+
+    /* ── Metric Cards ── */
+    .metric-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .metric-value {
+      font-size: 1.9rem;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    .metric-value.profit { color: #16a34a; }
+    .metric-delta {
+      font-size: 0.78rem;
+      font-weight: 500;
+      margin-top: 4px;
+    }
+    .delta-up   { color: #16a34a; }
+    .delta-warn { color: #d97706; }
+
+    /* ── Alert Cards ── */
+    .alert-card {
+      border-radius: 12px;
+      padding: 20px;
+      cursor: pointer;
+      transition: 0.15s transform, 0.15s box-shadow;
+    }
+    .alert-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+    .alert-card.red    { background: #fff5f5; border: 1px solid #fecaca; }
+    .alert-card.amber  { background: #fffbeb; border: 1px solid #fde68a; }
+    .alert-card.green  { background: #f0fdf4; border: 1px solid #bbf7d0; }
+    .alert-card.blue   { background: #eff6ff; border: 1px solid #bfdbfe; }
+
+    .alert-num {
+      font-size: 2.4rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .alert-card.red   .alert-num { color: #dc2626; }
+    .alert-card.amber .alert-num { color: #d97706; }
+    .alert-card.green .alert-num { color: #16a34a; }
+    .alert-card.blue  .alert-num { color: #2563eb; }
+
+    .alert-title { font-size: 0.85rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+    .alert-sub   { font-size: 0.75rem; color: var(--muted); margin-bottom: 10px; }
+    .alert-link  { font-size: 0.75rem; font-weight: 500; text-decoration: underline; cursor: pointer; }
+    .alert-card.red   .alert-link { color: #dc2626; }
+    .alert-card.amber .alert-link { color: #d97706; }
+    .alert-card.green .alert-link { color: #16a34a; }
+    .alert-card.blue  .alert-link { color: #2563eb; }
+
+    /* ── Table ── */
+    .disc-table { width: 100%; border-collapse: collapse; }
+    .disc-table th {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .disc-table td {
+      font-size: 0.85rem;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    .disc-table tr:last-child td { border-bottom: none; }
+    .status-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .pill-red     { background: #fee2e2; color: #b91c1c; }
+    .pill-green   { background: #dcfce7; color: #15803d; }
+    .pill-gray    { background: #f1f5f9; color: #475569; }
+
+    /* ── Revenue bars ── */
+    .rev-row { margin-bottom: 14px; }
+    .rev-row:last-child { margin-bottom: 0; }
+    .rev-label { font-size: 0.85rem; font-weight: 500; color: var(--ink); margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .rev-label span { color: var(--muted); font-weight: 400; }
+    .rev-track { background: #f1f5f9; border-radius: 6px; height: 8px; overflow: hidden; }
+    .rev-bar   { height: 100%; border-radius: 6px; }
+    .proc-row { margin-bottom: 10px; display: grid; grid-template-columns: 110px 1fr 45px 70px; align-items: center; gap: 8px; }
+    .proc-row:last-child { margin-bottom: 0; }
+    .proc-name { font-size: 0.82rem; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .proc-bar-wrap { background: #f1f5f9; border-radius: 6px; height: 8px; overflow: hidden; }
+    .proc-bar  { height: 100%; border-radius: 6px; }
+    .proc-pct  { font-size: 12px; color: var(--color-text-secondary, var(--muted)); text-align: right; }
+    .proc-val  { font-size: 0.82rem; color: var(--muted); text-align: right; }
+    .cash-badge { font-size: 10px; background: #EAF3DE; color: #3B6D11; padding: 1px 6px; border-radius: 10px; margin-left: 4px; }
+
+    /* ── Doctor list ── */
+    .doc-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .doc-row:last-child { border-bottom: none; }
+    .doc-rank { font-size: 0.8rem; color: var(--muted); width: 16px; flex-shrink: 0; }
+    .doc-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: inline-grid; place-items: center;
+      font-size: 0.72rem; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .doc-info { flex: 1; }
+    .doc-name { font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+    .doc-contact { font-size: 0.75rem; color: var(--muted); }
+    .doc-stats { text-align: right; flex-shrink: 0; }
+    .doc-rx  { font-size: 0.85rem; font-weight: 600; color: var(--ink); }
+    .doc-rev { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── Key insights ── */
+    .insight-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .insight-row:last-child { border-bottom: none; }
+    .insight-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      flex-shrink: 0; margin-top: 5px;
+    }
+    .dot-red   { background: #ef4444; }
+    .dot-amber { background: #f59e0b; }
+    .dot-green { background: #22c55e; }
+    .insight-title { font-size: 0.88rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+    .insight-sub   { font-size: 0.78rem; color: var(--muted); }
+
+    /* ── Section heading ── */
+    .section-heading {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+
+    /* ── Footer ── */
+    .app-footer {
+      position: fixed; bottom: 0; width: 100%;
+      text-align: center; font-size: 13px; color: #6c757d;
+      background: rgba(255,255,255,0.92); padding: 6px 0;
+      border-top: 1px solid var(--border); z-index: 1000;
+    }
+
+    /* ── Kinray clickable card + breakdown panel ── */
+    .metric.clickable { cursor: pointer; transition: all 0.15s; }
+    .metric.clickable:hover {
+      background: var(--color-background-primary);
+      border: 0.5px solid #185FA5;
+    }
+    .metric.active {
+      background: var(--color-background-primary);
+      border: 0.5px solid #185FA5;
+    }
+    .metric-hint {
+      font-size: 10px;
+      color: #185FA5;
+      margin-top: 6px;
+    }
+    .metric-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .panel {
+      background: var(--color-background-primary);
+      border: 0.5px solid var(--color-border-tertiary);
+      border-radius: 12px;
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.35s ease, opacity 0.25s ease;
+      margin-bottom: 12px;
+    }
+    .panel.open { max-height: 400px; opacity: 1; }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 0.5px solid var(--color-border-tertiary);
+    }
+    .panel-title { font-weight: 600; font-size: 0.9rem; }
+    .breakdown-grid { padding: 16px 20px; }
+    .breakdown-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .breakdown-label {
+      font-size: 13px;
+      width: 180px;
+      flex-shrink: 0;
+    }
+    .breakdown-bar-wrap {
+      flex: 1;
+      height: 8px;
+      background: var(--color-background-secondary);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .breakdown-bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+    .breakdown-value {
+      font-size: 13px;
+      font-weight: 500;
+      min-width: 90px;
+      text-align: right;
+    }
+    .breakdown-pct {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      min-width: 38px;
+      text-align: right;
+    }
+    .breakdown-total {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 500;
+      padding-top: 8px;
+    }
+    #panel-donotorder.open { max-height: 700px; }
+    .panel-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; font-weight: 500; }
+    .panel-actions { display: flex; align-items: center; gap: 8px; }
+    .search-input { font-size: 13px; padding: 5px 10px; border: 1px solid var(--color-border-tertiary); border-radius: 6px; outline: none; width: 180px; }
+    .export-btn { font-size: 12px; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+    .btn-ghost { font-size: 12px; color: var(--color-text-secondary); background: none; border: 1px solid var(--color-border-tertiary); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+    .btn-primary-sm { font-size: 12px; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+    .scroll-body { overflow-y: auto; max-height: 480px; }
+    .panel-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .panel-table th { position: sticky; top: 0; background: var(--color-background-secondary); padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--color-border-tertiary); white-space: nowrap; }
+    .panel-table td { padding: 7px 12px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+    .panel-table tr:last-child td { border-bottom: none; }
+    .panel-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; border-top: 0.5px solid var(--color-border-tertiary); font-size: 12px; color: var(--color-text-secondary); background: var(--color-background-secondary); }
+  </style>
+</head>
+<body>
+
+  <!-- ── NAVBAR ── -->
+  <nav class="pt-navbar">
+    <div class="container-fluid px-4 d-flex align-items-center gap-3 flex-wrap">
+      <!-- Left: logo + brand + pharmacy badge -->
+      <div class="d-flex align-items-center gap-2 me-2">
+        <span class="pt-logo-box">Rx</span>
+        <span class="pt-brand-name">PharmaTrack</span>
+      </div>
+      <span class="pt-pharmacy-badge">{{ pharmacy_name }} &mdash; {{ date_range }}</span>
+
+      <!-- Right: action buttons -->
+      <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
+        <button class="pt-nav-btn">New analysis</button>
+        <button class="pt-nav-btn">Download main<br>report</button>
+        <button class="pt-nav-btn">Download audit<br>report</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid px-4 pt-4">
+
+    <!-- ── METRIC CARDS ── -->
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100">
+          <div class="metric-label">Total Rx processed</div>
+          <div class="metric-value">{{ summary.total_rx | default(0) }}</div>
+          <div class="metric-delta delta-up"><i class="bi bi-arrow-up-short"></i>+312 vs last month</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100 metric">
+          <div class="metric-label">
+            Insurance paid (All PBM - BestRx)
+          </div>
+          <div class="metric-value">
+            ${{ '{:,.0f}'.format(summary.all_pbm_total | default(0)) }}
+          </div>
+          <div class="metric-sub">
+            Sum of Ins Paid Total · BestRx
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100 metric clickable"
+             id="kinray-card"
+             onclick="toggleKinray()">
+          <div class="metric-label">
+            Total purchased (Kinray)
+          </div>
+          <div class="metric-value">
+            ${{ '{:,.0f}'.format(summary.total_kinray | default(0)) }}
+          </div>
+          <div class="metric-sub">
+            {{ summary.kinray_rows | default(0) }} invoices &middot;
+            {{ summary.kinray_ndcs | default(0) }} NDCs
+          </div>
+          <div class="metric-hint">
+            Click to see breakdown
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100 metric">
+          <div class="metric-label">Net profit</div>
+          <div class="metric-value"
+               style="color:var(--color-text-secondary);font-size:14px;padding-top:6px">
+            Coming soon
+          </div>
+          <div class="metric-sub">
+            After full data verified
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── KINRAY BREAKDOWN PANEL ── -->
+    <div class="panel" id="kinray-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          Kinray purchase breakdown
+        </div>
+        <button onclick="toggleKinray()">×</button>
+      </div>
+      <div class="breakdown-grid">
+        {% set total_k = summary.total_kinray | default(1) %}
+        {% for item in summary.kinray_by_type | default([]) %}
+        <div class="breakdown-row">
+          <span class="breakdown-label">
+            {{ item.type }}
+            {% if item.total < 0 %}
+            <span style="font-size:10px;background:#FCEBEB;color:#A32D2D;padding:1px 6px;border-radius:10px;margin-left:4px">rebate</span>
+            {% endif %}
+          </span>
+          <div class="breakdown-bar-wrap">
+            <div class="breakdown-bar"
+                 data-w="{{ [((item.total|abs/total_k)*100), 0]|max|round(1) }}"
+                 style="width:0%;background:#185FA5">
+            </div>
+          </div>
+          {% if item.total < 0 %}
+          <span class="breakdown-value" style="color:#A32D2D">
+            -${{ '{:,.2f}'.format(item.total|abs) }}
+          </span>
+          {% else %}
+          <span class="breakdown-value">
+            ${{ '{:,.2f}'.format(item.total) }}
+          </span>
+          {% endif %}
+          <span class="breakdown-pct">
+            {% if item.total < 0 %}-{% endif %}{{ ((item.total|abs/total_k)*100)|round(1) }}%
+          </span>
+        </div>
+        {% endfor %}
+        <hr/>
+        <div class="breakdown-total">
+          <span>Total</span>
+          <span>
+            ${{ '{:,.2f}'.format(summary.total_kinray | default(0)) }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ALERT CARDS ── -->
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="alert-card red h-100" onclick="window.location.href='/sheet/needs_ordering?job_id={{ job_id }}'" style="cursor:pointer">
+          <div class="alert-num">{{ excel_data.needs_ordering.count | default(0) }}</div>
+          <div class="alert-title">Drugs need ordering</div>
+          <div class="alert-sub">Est. $8,420 in lost margin</div>
+          <div class="alert-link">View order list</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="alert-card amber h-100" onclick="window.location.href='/sheet/never_purchased?job_id={{ job_id }}'" style="cursor:pointer">
+          <div class="alert-num">{{ excel_data.never_purchased.count | default(0) }}</div>
+          <div class="alert-title">Never purchased &mdash; check</div>
+          <div class="alert-sub">$12,300 at risk</div>
+          <div class="alert-link">Investigate now</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="alert-card green h-100" onclick="window.location='/sheet/do_not_order?job_id={{ job_id }}'" style="cursor:pointer">
+          <div class="alert-num">{{ excel_data.do_not_order.count | default(0) }}</div>
+          <div class="alert-title">Drugs overstocked</div>
+          <div class="alert-sub">Do not order these items</div>
+          <div class="alert-link">View do-not-order list</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="alert-card blue h-100" onclick="window.location.href='/sheet/rx_comparison?job_id={{ job_id }}'" style="cursor:pointer">
+          <div class="alert-num">{{ excel_data.rx_comparison.count | default(0) }}</div>
+          <div class="alert-title">Rx comparisons analyzed</div>
+          <div class="alert-sub">47 underpayments detected</div>
+          <div class="alert-link">View full comparison</div>
+        </div>
+      </div>
+    </div>
+
+    {% if summary.branded_not_billed_count > 0 %}
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <span style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Financial alerts</span>
+          <span style="font-size:12px;color:var(--color-text-secondary);margin-left:8px">Issues requiring attention</span>
+        </div>
+        <span style="background:#FCEBEB;color:#A32D2D;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px">
+          ${{ '{:,.0f}'.format(summary.branded_not_billed_total | default(0)) }} at risk
+        </span>
+      </div>
+
+      <div style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:12px;overflow:hidden;cursor:pointer"
+           id="unbilled-card"
+           onclick="toggleUnbilled()">
+        <div style="height:3px;background:#E24B4A"></div>
+        <div style="padding:14px 16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:32px;height:32px;border-radius:8px;background:#FCEBEB;display:flex;align-items:center;justify-content:center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A32D2D" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="8" x2="12" y2="12"/>
+                  <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Branded drugs purchased but not billed</div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">Purchased from Kinray but no matching Rx found in BestRx</div>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-left:16px">
+              <div style="font-size:20px;font-weight:500;color:#A32D2D">
+                ${{ '{:,.0f}'.format(summary.branded_not_billed_total | default(0)) }}
+              </div>
+              <div style="font-size:11px;color:var(--color-text-secondary)">
+                {{ summary.branded_not_billed_count | default(0) }} drugs · click to view
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-unbilled">
+        <div class="panel-header">
+          <div class="panel-title">Branded drugs purchased but not billed</div>
+          <button class="close-btn" onclick="toggleUnbilled()">×</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="panel-table">
+            <thead>
+              <tr>
+                <th>Drug name</th>
+                <th style="text-align:right">Kinray cost</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for drug in summary.branded_not_billed | default([]) %}
+              <tr>
+                <td style="font-weight:500">{{ drug.drug }}</td>
+                <td style="text-align:right;font-weight:500;color:{% if drug.is_vaccine %}#854F0B{% else %}#A32D2D{% endif %}">
+                  ${{ '{:,.2f}'.format(drug.cost) }}
+                </td>
+                <td>
+                  {% if drug.is_vaccine %}
+                  <span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:2px 7px;border-radius:20px">Vaccine — billed separately</span>
+                  {% else %}
+                  <span style="font-size:10px;background:#FCEBEB;color:#A32D2D;padding:2px 7px;border-radius:20px">Investigate</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="panel-footer">
+          <span>
+            {{ summary.branded_not_billed_count | default(0) }} drugs ·
+            ${{ '{:,.0f}'.format(summary.branded_not_billed_investigate_total | default(0)) }} needs investigation (excl. vaccines)
+          </span>
+          <button class="export-sm" onclick="exportUnbilled()">Export CSV</button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <script>
+    const EXCEL_DATA = {{ excel_data | tojson }};
+    const JOB_ID = '{{ job_id }}';
+    </script>
+
+    <div class="panel" id="panel-donotorder">
+      <div class="panel-header">
+        <div class="panel-title">
+          Drugs overstocked — do not order
+          <span class="panel-badge" style="background:#EAF3DE;color:#3B6D11">
+            {{ excel_data.do_not_order.count | default(0) }} drugs
+          </span>
+        </div>
+        <div class="panel-actions">
+          <input class="search-input" id="search-donotorder" placeholder="Search drug name..." oninput="filterDNO()"/>
+          <button class="export-btn" style="background:#639922" onclick="exportDNO()">Export list</button>
+          <button class="btn-ghost" onclick="togglePanel('donotorder')">Close</button>
+        </div>
+      </div>
+      <div class="scroll-body">
+        <table class="panel-table" id="table-donotorder">
+          <thead id="thead-donotorder"></thead>
+          <tbody id="tbody-donotorder"></tbody>
+        </table>
+      </div>
+      <div class="panel-footer">
+        <div>Showing <span id="showing-dno">0</span> of <span id="total-dno">0</span> drugs</div>
+        <div>
+          <button class="btn-primary-sm" id="loadmore-dno" onclick="loadMoreDNO()" style="display:none;background:#639922">Load more</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DISCREPANCIES + REVENUE ROW ── -->
+    <div class="row g-3 mb-3">
+
+      <!-- Left: Top discrepancies table -->
+      <div class="col-12 col-lg-6">
+        <div class="pt-card h-100">
+          <div class="section-heading">Top discrepancies by drug</div>
+          <table class="disc-table">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Drug name</th>
+                <th style="text-align:center;">Billed</th>
+                <th style="text-align:center;">Purchased</th>
+                <th style="text-align:right;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Atorvastatin 10mg</td>
+                <td style="text-align:center;">4.5 pkg</td>
+                <td style="text-align:center;">2.0 pkg</td>
+                <td style="text-align:right;"><span class="status-pill pill-red">-2.5 pkg</span></td>
+              </tr>
+              <tr>
+                <td>Metformin 500mg</td>
+                <td style="text-align:center;">3.0 pkg</td>
+                <td style="text-align:center;">4.2 pkg</td>
+                <td style="text-align:right;"><span class="status-pill pill-green">+1.2 pkg</span></td>
+              </tr>
+              <tr>
+                <td>Lisinopril 10mg</td>
+                <td style="text-align:center;">7.0 pkg</td>
+                <td style="text-align:center;">6.6 pkg</td>
+                <td style="text-align:right;"><span class="status-pill pill-red">-0.4 pkg</span></td>
+              </tr>
+              <tr>
+                <td>Ozempic 0.5mg</td>
+                <td style="text-align:center;">2.0 pkg</td>
+                <td style="text-align:center;">2.0 pkg</td>
+                <td style="text-align:right;"><span class="status-pill pill-gray">balanced</span></td>
+              </tr>
+              <tr>
+                <td>Amlodipine 5mg</td>
+                <td style="text-align:center;">5.6 pkg</td>
+                <td style="text-align:center;">4.7 pkg</td>
+                <td style="text-align:right;"><span class="status-pill pill-red">-0.9 pkg</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Right: Revenue by processor -->
+      <div class="col-12 col-lg-6">
+        <div class="pt-card h-100">
+          <div class="section-heading">Revenue by processor</div>
+
+          {% set total_rev = namespace(value=0) %}
+          {% for p in summary.by_processor %}
+            {% set total_rev.value = total_rev.value + p.total_paid %}
+          {% endfor %}
+          {% for p in summary.by_processor %}
+          {% set pct = ((p.total_paid / total_rev.value) * 100) if total_rev.value > 0 else 0 %}
+          <div class="proc-row">
+            <span class="proc-name">
+              {{ p.processor }}
+              {% if p.processor == 'CASH' %}<span class="cash-badge">cash</span>{% endif %}
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar"
+                   style="width:{{ [pct,0]|max|round(1) }}%;background:{% if p.processor == 'CASH' %}#639922{% else %}#185FA5{% endif %};">
+              </div>
+            </div>
+            <span class="proc-pct">{{ pct|round(1) }}%</span>
+            <span class="proc-val">${{ '{:,.0f}'.format(p.total_paid) }}</span>
+          </div>
+          {% else %}
+          <p class="text-muted small">No processor data available.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DOCTORS + INSIGHTS ROW ── -->
+    <div class="row g-3">
+
+      <!-- Left: Top referring doctors -->
+      <div class="col-12 col-lg-6">
+        <div class="card" id="doctor-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:0.5px solid var(--color-border-tertiary)">
+            <span class="card-title">Top referring doctors</span>
+            <button id="docExpandBtn" onclick="toggleDoctorList()" style="font-size:12px;color:#185FA5;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px">
+              ▾ Show all {{ top_doctors|length }} doctors
+            </button>
+          </div>
+
+          {% set max_rx = top_doctors[0].rx_count if top_doctors else 1 %}
+
+          {% for doc in top_doctors %}
+          {% set bar_w = ((doc.rx_count / max_rx) * 100)|round(1) %}
+          <div class="doc-row" id="doc-row-{{ loop.index0 }}"
+               {% if loop.index > 5 %}
+               style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true"
+               {% else %}
+               style="border-bottom:0.5px solid var(--color-border-tertiary)"
+               {% endif %}>
+
+            <div onclick="toggleDoc({{ loop.index0 }})"
+                 style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s"
+                 onmouseover="this.style.background='var(--color-background-secondary)'"
+                 onmouseout="this.style.background='transparent'">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">{{ loop.index }}</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                {{ doc.initials }}
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  {{ doc.name }}
+                  {% if doc.locations > 1 %}
+                  <span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:10px;margin-left:4px">{{ doc.locations }} locations</span>
+                  {% endif %}
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">{{ doc.phone }} · {{ doc.city }}, {{ doc.state }}</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:{{ bar_w }}%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">{{ doc.rx_count }} Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">{{ doc.pct }}% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">{{ doc.ins_rx }} ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">{{ doc.cash_rx }} cash</span>
+                </div>
+              </div>
+              <span id="arrow-{{ loop.index0 }}" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-{{ loop.index0 }}" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 {{ doc.phone }}<br>
+                    📠 {{ doc.fax }}
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    {{ doc.address }}<br>
+                    {{ doc.city }}, {{ doc.state }} {{ doc.zip }}
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">{{ doc.npi }}</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>{{ doc.ins_rx }} Rx</strong><br>
+                    Cash: <strong>{{ doc.cash_rx }} Rx</strong><br>
+                    Total: <strong>{{ doc.rx_count }} Rx ({{ doc.pct }}%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <p class="text-muted small" style="padding:16px 20px">No prescriber data found in custom log.</p>
+          {% endfor %}
+
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;background:var(--color-background-secondary);font-size:12px;color:var(--color-text-secondary);border-top:0.5px solid var(--color-border-tertiary)">
+            <span>Showing top <span id="showingCount">5</span> of {{ top_doctors|length }} doctors</span>
+            <span>
+              {% set total_top = namespace(value=0) %}
+              {% for doc in top_doctors[:5] %}{% set total_top.value = total_top.value + doc.rx_count %}{% endfor %}
+              Top 5: {{ total_top.value }} Rx
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Key insights -->
+      <div class="col-12 col-lg-6">
+        <div class="pt-card h-100">
+          <div class="section-heading">Key insights</div>
+
+          <div class="insight-row">
+            <span class="insight-dot dot-red"></span>
+            <div>
+              <div class="insight-title">Caremark underpaid on 47 prescriptions</div>
+              <div class="insight-sub">Total underpayment: $3,240 &mdash; eligible for dispute</div>
+            </div>
+          </div>
+
+          <div class="insight-row">
+            <span class="insight-dot dot-red"></span>
+            <div>
+              <div class="insight-title">12 drugs billed but never purchased from any vendor</div>
+              <div class="insight-sub">Possible data entry error &mdash; investigate immediately</div>
+            </div>
+          </div>
+
+          <div class="insight-row">
+            <span class="insight-dot dot-amber"></span>
+            <div>
+              <div class="insight-title">89 patients overdue for refills</div>
+              <div class="insight-sub">Estimated recoverable revenue: $12,800</div>
+            </div>
+          </div>
+
+          <div class="insight-row">
+            <span class="insight-dot dot-amber"></span>
+            <div>
+              <div class="insight-title">Dr. Montan volume down 18% vs last month</div>
+              <div class="insight-sub">Consider reaching out to maintain relationship</div>
+            </div>
+          </div>
+
+          <div class="insight-row">
+            <span class="insight-dot dot-green"></span>
+            <div>
+              <div class="insight-title">Net profit up 11% vs last month</div>
+              <div class="insight-sub">Kinray pricing efficiency improved significantly</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="app-footer">
+    &copy; <span id="year"></span> Developed by <strong>Priyanka Gulgari</strong>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    let allDocsVisible = false;
+
+    function toggleDoctorList() {
+      allDocsVisible = !allDocsVisible;
+      document.querySelectorAll('[data-extra="true"]').forEach(el => {
+        el.style.display = allDocsVisible ? 'block' : 'none';
+      });
+      const btn = document.getElementById('docExpandBtn');
+      const count = document.getElementById('showingCount');
+      if (allDocsVisible) {
+        btn.textContent = '▴ Show less';
+        count.textContent = document.querySelectorAll('.doc-row').length;
+      } else {
+        btn.textContent = '▾ Show all doctors';
+        count.textContent = '5';
+      }
+    }
+
+    function toggleDoc(idx) {
+      const detail = document.getElementById('detail-' + idx);
+      const arrow = document.getElementById('arrow-' + idx);
+      const isOpen = detail.style.maxHeight && detail.style.maxHeight !== '0px' && detail.style.maxHeight !== '';
+      if (isOpen) {
+        detail.style.maxHeight = '0';
+        detail.style.opacity = '0';
+        arrow.style.transform = 'rotate(0deg)';
+      } else {
+        detail.style.maxHeight = '300px';
+        detail.style.opacity = '1';
+        arrow.style.transform = 'rotate(180deg)';
+      }
+    }
+
+    let dnoPage = 1;
+    let dnoAllRows = [];
+    let dnoColumns = [];
+
+    function togglePanel(id) {
+      const panel = document.getElementById('panel-' + id);
+      const isOpen = panel.classList.contains('open');
+      panel.classList.toggle('open', !isOpen);
+      if (!isOpen && id === 'donotorder') {
+        loadDNOData();
+      }
+    }
+
+    function loadDNOData() {
+      const data = EXCEL_DATA['do_not_order'];
+      if (!data || data.count === 0) {
+        document.getElementById('tbody-donotorder').innerHTML =
+          '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--color-text-secondary)">No data found</td></tr>';
+        return;
+      }
+      dnoColumns = data.columns;
+      dnoAllRows = data.rows;
+      document.getElementById('thead-donotorder').innerHTML =
+        '<tr>' + dnoColumns.map(c => `<th>${c}</th>`).join('') + '</tr>';
+      renderDNO(dnoAllRows.slice(0, 50));
+      document.getElementById('showing-dno').textContent = Math.min(50, dnoAllRows.length);
+      document.getElementById('total-dno').textContent = data.count;
+      if (data.count > 50) {
+        document.getElementById('loadmore-dno').style.display = 'block';
+      }
+    }
+
+    function renderDNO(rows) {
+      document.getElementById('tbody-donotorder').innerHTML =
+        rows.map(row => '<tr>' + row.map(cell => `<td>${cell}</td>`).join('') + '</tr>').join('');
+    }
+
+    function filterDNO() {
+      const search = document.getElementById('search-donotorder').value.toLowerCase();
+      const filtered = search
+        ? dnoAllRows.filter(row => row.some(cell => String(cell).toLowerCase().includes(search)))
+        : dnoAllRows;
+      renderDNO(filtered.slice(0, 50));
+      document.getElementById('showing-dno').textContent = Math.min(50, filtered.length);
+      document.getElementById('total-dno').textContent = filtered.length;
+    }
+
+    async function loadMoreDNO() {
+      dnoPage++;
+      try {
+        const res = await fetch(`/api/sheet_data?job_id=${JOB_ID}&sheet=do_not_order&page=${dnoPage}`);
+        const data = await res.json();
+        if (data.ok) {
+          const tbody = document.getElementById('tbody-donotorder');
+          data.rows.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = row.map(cell => `<td>${cell}</td>`).join('');
+            tbody.appendChild(tr);
+          });
+          const showing = document.getElementById('showing-dno');
+          showing.textContent = parseInt(showing.textContent) + data.rows.length;
+          if (!data.has_more) document.getElementById('loadmore-dno').style.display = 'none';
+        }
+      } catch(e) { console.error(e); }
+    }
+
+    let unbilledOpen = false;
+
+    function toggleUnbilled() {
+      unbilledOpen = !unbilledOpen;
+      const panel = document.getElementById('panel-unbilled');
+      const card  = document.getElementById('unbilled-card');
+      panel.classList.toggle('open', unbilledOpen);
+      card.style.boxShadow = unbilledOpen ? '0 0 0 2px #E24B4A' : 'none';
+    }
+
+    function exportUnbilled() {
+      const drugs = {{ summary.branded_not_billed | tojson }};
+      const headers = 'Drug Name,Kinray Cost,Status';
+      const rows = drugs.map(d =>
+        `"${d.drug}",${d.cost.toFixed(2)},"${d.status}"`
+      ).join('\n');
+      const csv = headers + '\n' + rows;
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'branded_not_billed.csv';
+      a.click();
+    }
+
+    function exportDNO() {
+      if (!dnoAllRows.length) return;
+      const headers = dnoColumns.join(',');
+      const rows = dnoAllRows.map(r =>
+        r.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')
+      ).join('\n');
+      const csv = headers + '\n' + rows;
+      const blob = new Blob([csv], {type: 'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'do_not_order.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    let kinrayOpen = false;
+    function toggleKinray() {
+      kinrayOpen = !kinrayOpen;
+      document.getElementById('kinray-panel')
+        .classList.toggle('open', kinrayOpen);
+      document.getElementById('kinray-card')
+        .classList.toggle('active', kinrayOpen);
+      if (kinrayOpen) {
+        setTimeout(() => {
+          document.querySelectorAll('.breakdown-bar')
+            .forEach(b => b.style.width = b.dataset.w + '%');
+        }, 50);
+      }
+    }
+  </script>
+</body>
+</html>
