@@ -1,0 +1,2591 @@
+<!DOCTYPE html>
+<!-- saved from url=(0071)http://127.0.0.1:5000/dashboard?job_id=2292753a937e4fff8588d03de9d4ea3e -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PharmaTrack — Dashboard</title>
+
+  <!-- Google Font: DM Sans -->
+  <link href="./PharmaTrack — Dashboard_files/css2" rel="stylesheet">
+  <!-- Bootstrap 5 + Icons -->
+  <link href="./PharmaTrack — Dashboard_files/bootstrap.min.css" rel="stylesheet">
+  <link href="./PharmaTrack — Dashboard_files/bootstrap-icons.css" rel="stylesheet">
+
+  <style>
+    :root {
+      --brand: #0f4c81;
+      --brand-light: #1a6bb5;
+      --brand-soft: #e8f2ff;
+      --accent: #00c48c;
+      --bg: #f7f9fc;
+      --border: #e2e8f0;
+      --ink: #1a202c;
+      --muted: #64748b;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
+      color: var(--ink);
+      padding-bottom: 60px;
+    }
+
+    /* ── Navbar ── */
+    .pt-navbar {
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 0;
+      position: sticky;
+      top: 0;
+      z-index: 1050;
+    }
+    .pt-logo-box {
+      background: var(--brand);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: inline-grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .pt-brand-name { font-weight: 600; font-size: 1.05rem; color: var(--ink); }
+    .pt-pharmacy-badge {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--ink);
+    }
+    .pt-nav-btn {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--ink);
+      cursor: pointer;
+      transition: 0.15s all;
+      text-align: center;
+      line-height: 1.3;
+    }
+    .pt-nav-btn:hover { background: var(--bg); border-color: #c3d9f5; color: var(--brand); }
+
+    /* ── Cards base ── */
+    .pt-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(15, 76, 129, 0.05);
+    }
+
+    /* ── Metric Cards ── */
+    .metric-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    .metric-value {
+      font-size: 1.9rem;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1.15;
+    }
+    .metric-value.profit { color: #16a34a; }
+    .metric-delta {
+      font-size: 0.78rem;
+      font-weight: 500;
+      margin-top: 4px;
+    }
+    .delta-up   { color: #16a34a; }
+    .delta-warn { color: #d97706; }
+
+    /* ── Alert Cards ── */
+    .alert-card {
+      border-radius: 12px;
+      padding: 20px;
+      cursor: pointer;
+      transition: 0.15s transform, 0.15s box-shadow;
+    }
+    .alert-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
+    .alert-card.red    { background: #fff5f5; border: 1px solid #fecaca; }
+    .alert-card.amber  { background: #fffbeb; border: 1px solid #fde68a; }
+    .alert-card.green  { background: #f0fdf4; border: 1px solid #bbf7d0; }
+    .alert-card.blue   { background: #eff6ff; border: 1px solid #bfdbfe; }
+
+    .alert-num {
+      font-size: 2.4rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .alert-card.red   .alert-num { color: #dc2626; }
+    .alert-card.amber .alert-num { color: #d97706; }
+    .alert-card.green .alert-num { color: #16a34a; }
+    .alert-card.blue  .alert-num { color: #2563eb; }
+
+    .alert-title { font-size: 0.85rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+    .alert-sub   { font-size: 0.75rem; color: var(--muted); margin-bottom: 10px; }
+    .alert-link  { font-size: 0.75rem; font-weight: 500; text-decoration: underline; cursor: pointer; }
+    .alert-card.red   .alert-link { color: #dc2626; }
+    .alert-card.amber .alert-link { color: #d97706; }
+    .alert-card.green .alert-link { color: #16a34a; }
+    .alert-card.blue  .alert-link { color: #2563eb; }
+
+    /* ── Table ── */
+    .disc-table { width: 100%; border-collapse: collapse; }
+    .disc-table th {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .disc-table td {
+      font-size: 0.85rem;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    .disc-table tr:last-child td { border-bottom: none; }
+    .status-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .pill-red     { background: #fee2e2; color: #b91c1c; }
+    .pill-green   { background: #dcfce7; color: #15803d; }
+    .pill-gray    { background: #f1f5f9; color: #475569; }
+
+    /* ── Revenue bars ── */
+    .rev-row { margin-bottom: 14px; }
+    .rev-row:last-child { margin-bottom: 0; }
+    .rev-label { font-size: 0.85rem; font-weight: 500; color: var(--ink); margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .rev-label span { color: var(--muted); font-weight: 400; }
+    .rev-track { background: #f1f5f9; border-radius: 6px; height: 8px; overflow: hidden; }
+    .rev-bar   { height: 100%; border-radius: 6px; }
+    .proc-row { margin-bottom: 10px; display: grid; grid-template-columns: 110px 1fr 45px 70px; align-items: center; gap: 8px; }
+    .proc-row:last-child { margin-bottom: 0; }
+    .proc-name { font-size: 0.82rem; font-weight: 500; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .proc-bar-wrap { background: #f1f5f9; border-radius: 6px; height: 8px; overflow: hidden; }
+    .proc-bar  { height: 100%; border-radius: 6px; }
+    .proc-pct  { font-size: 12px; color: var(--color-text-secondary, var(--muted)); text-align: right; }
+    .proc-val  { font-size: 0.82rem; color: var(--muted); text-align: right; }
+    .cash-badge { font-size: 10px; background: #EAF3DE; color: #3B6D11; padding: 1px 6px; border-radius: 10px; margin-left: 4px; }
+
+    /* ── Doctor list ── */
+    .doc-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .doc-row:last-child { border-bottom: none; }
+    .doc-rank { font-size: 0.8rem; color: var(--muted); width: 16px; flex-shrink: 0; }
+    .doc-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      display: inline-grid; place-items: center;
+      font-size: 0.72rem; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .doc-info { flex: 1; }
+    .doc-name { font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+    .doc-contact { font-size: 0.75rem; color: var(--muted); }
+    .doc-stats { text-align: right; flex-shrink: 0; }
+    .doc-rx  { font-size: 0.85rem; font-weight: 600; color: var(--ink); }
+    .doc-rev { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── Key insights ── */
+    .insight-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 12px 0;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .insight-row:last-child { border-bottom: none; }
+    .insight-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      flex-shrink: 0; margin-top: 5px;
+    }
+    .dot-red   { background: #ef4444; }
+    .dot-amber { background: #f59e0b; }
+    .dot-green { background: #22c55e; }
+    .insight-title { font-size: 0.88rem; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+    .insight-sub   { font-size: 0.78rem; color: var(--muted); }
+
+    /* ── Section heading ── */
+    .section-heading {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+
+    /* ── Footer ── */
+    .app-footer {
+      position: fixed; bottom: 0; width: 100%;
+      text-align: center; font-size: 13px; color: #6c757d;
+      background: rgba(255,255,255,0.92); padding: 6px 0;
+      border-top: 1px solid var(--border); z-index: 1000;
+    }
+
+    /* ── Kinray clickable card + breakdown panel ── */
+    .metric.clickable { cursor: pointer; transition: all 0.15s; }
+    .metric.clickable:hover {
+      background: var(--color-background-primary);
+      border: 0.5px solid #185FA5;
+    }
+    .metric.active {
+      background: var(--color-background-primary);
+      border: 0.5px solid #185FA5;
+    }
+    .metric-hint {
+      font-size: 10px;
+      color: #185FA5;
+      margin-top: 6px;
+    }
+    .metric-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .panel {
+      background: var(--color-background-primary);
+      border: 0.5px solid var(--color-border-tertiary);
+      border-radius: 12px;
+      overflow: hidden;
+      max-height: 0;
+      opacity: 0;
+      transition: max-height 0.35s ease, opacity 0.25s ease;
+      margin-bottom: 12px;
+    }
+    .panel.open { max-height: 400px; opacity: 1; }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 0.5px solid var(--color-border-tertiary);
+    }
+    .panel-title { font-weight: 600; font-size: 0.9rem; }
+    .breakdown-grid { padding: 16px 20px; }
+    .breakdown-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .breakdown-label {
+      font-size: 13px;
+      width: 180px;
+      flex-shrink: 0;
+    }
+    .breakdown-bar-wrap {
+      flex: 1;
+      height: 8px;
+      background: var(--color-background-secondary);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .breakdown-bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+    .breakdown-value {
+      font-size: 13px;
+      font-weight: 500;
+      min-width: 90px;
+      text-align: right;
+    }
+    .breakdown-pct {
+      font-size: 11px;
+      color: var(--color-text-secondary);
+      min-width: 38px;
+      text-align: right;
+    }
+    .breakdown-total {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 500;
+      padding-top: 8px;
+    }
+    #panel-donotorder.open { max-height: 700px; }
+    .panel-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; font-weight: 500; }
+    .panel-actions { display: flex; align-items: center; gap: 8px; }
+    .search-input { font-size: 13px; padding: 5px 10px; border: 1px solid var(--color-border-tertiary); border-radius: 6px; outline: none; width: 180px; }
+    .export-btn { font-size: 12px; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+    .btn-ghost { font-size: 12px; color: var(--color-text-secondary); background: none; border: 1px solid var(--color-border-tertiary); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+    .btn-primary-sm { font-size: 12px; color: #fff; border: none; border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+    .scroll-body { overflow-y: auto; max-height: 480px; }
+    .panel-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .panel-table th { position: sticky; top: 0; background: var(--color-background-secondary); padding: 8px 12px; text-align: left; font-weight: 600; border-bottom: 1px solid var(--color-border-tertiary); white-space: nowrap; }
+    .panel-table td { padding: 7px 12px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+    .panel-table tr:last-child td { border-bottom: none; }
+    .panel-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; border-top: 0.5px solid var(--color-border-tertiary); font-size: 12px; color: var(--color-text-secondary); background: var(--color-background-secondary); }
+  </style>
+</head>
+<body>
+
+  <!-- ── NAVBAR ── -->
+  <nav class="pt-navbar">
+    <div class="container-fluid px-4 d-flex align-items-center gap-3 flex-wrap">
+      <!-- Left: logo + brand + pharmacy badge -->
+      <div class="d-flex align-items-center gap-2 me-2">
+        <span class="pt-logo-box">Rx</span>
+        <span class="pt-brand-name">PharmaTrack</span>
+      </div>
+      <span class="pt-pharmacy-badge">New Data March — Mar 2026 - Mar 2026</span>
+
+      <!-- Right: action buttons -->
+      <div class="d-flex align-items-center gap-2 ms-auto flex-wrap">
+        <button class="pt-nav-btn">New analysis</button>
+        <button class="pt-nav-btn">Download main<br>report</button>
+        <button class="pt-nav-btn">Download audit<br>report</button>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid px-4 pt-4">
+
+    <!-- ── METRIC CARDS ── -->
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100">
+          <div class="metric-label">Total Rx processed</div>
+          <div class="metric-value">4130</div>
+          <div class="metric-sub">4130 total prescriptions</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100 metric">
+          <div class="metric-label">
+            Insurance paid (All PBM - BestRx)
+          </div>
+          <div class="metric-value">
+            $545,484
+          </div>
+          <div class="metric-sub">
+            Sum of Ins Paid Total · BestRx
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100 metric clickable" id="kinray-card" onclick="toggleKinray()">
+          <div class="metric-label">
+            Total purchased (Kinray)
+          </div>
+          <div class="metric-value">
+            $384,891
+          </div>
+          <div class="metric-sub">
+            1069 invoices ·
+            787 NDCs
+          </div>
+          <div class="metric-hint">
+            Click to see breakdown
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="pt-card h-100 metric">
+          <div class="metric-label">Net profit</div>
+          <div class="metric-value" style="color:var(--color-text-secondary);font-size:14px;padding-top:6px">
+            Coming soon
+          </div>
+          <div class="metric-sub">
+            After full data verified
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── KINRAY BREAKDOWN PANEL ── -->
+    <div class="panel" id="kinray-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          Kinray purchase breakdown
+        </div>
+        <button onclick="toggleKinray()">×</button>
+      </div>
+      <div class="breakdown-grid">
+        
+        
+        <div class="breakdown-row">
+          <span class="breakdown-label">
+            Branded Drug
+            
+          </span>
+          <div class="breakdown-bar-wrap">
+            <div class="breakdown-bar" data-w="87.2" style="width: 87.2%; background: rgb(24, 95, 165);">
+            </div>
+          </div>
+          
+          <span class="breakdown-value">
+            $335,470.57
+          </span>
+          
+          <span class="breakdown-pct">
+            87.2%
+          </span>
+        </div>
+        
+        <div class="breakdown-row">
+          <span class="breakdown-label">
+            Generic Drug
+            
+          </span>
+          <div class="breakdown-bar-wrap">
+            <div class="breakdown-bar" data-w="10.4" style="width: 10.4%; background: rgb(24, 95, 165);">
+            </div>
+          </div>
+          
+          <span class="breakdown-value">
+            $40,139.04
+          </span>
+          
+          <span class="breakdown-pct">
+            10.4%
+          </span>
+        </div>
+        
+        <div class="breakdown-row">
+          <span class="breakdown-label">
+            OTC Drug
+            
+          </span>
+          <div class="breakdown-bar-wrap">
+            <div class="breakdown-bar" data-w="2.2" style="width: 2.2%; background: rgb(24, 95, 165);">
+            </div>
+          </div>
+          
+          <span class="breakdown-value">
+            $8,547.05
+          </span>
+          
+          <span class="breakdown-pct">
+            2.2%
+          </span>
+        </div>
+        
+        <div class="breakdown-row">
+          <span class="breakdown-label">
+            Home Health Care
+            
+          </span>
+          <div class="breakdown-bar-wrap">
+            <div class="breakdown-bar" data-w="1.1" style="width: 1.1%; background: rgb(24, 95, 165);">
+            </div>
+          </div>
+          
+          <span class="breakdown-value">
+            $4,407.78
+          </span>
+          
+          <span class="breakdown-pct">
+            1.1%
+          </span>
+        </div>
+        
+        <div class="breakdown-row">
+          <span class="breakdown-label">
+            Health and Beauty Aid
+            
+          </span>
+          <div class="breakdown-bar-wrap">
+            <div class="breakdown-bar" data-w="0.6" style="width: 0.6%; background: rgb(24, 95, 165);">
+            </div>
+          </div>
+          
+          <span class="breakdown-value">
+            $2,194.73
+          </span>
+          
+          <span class="breakdown-pct">
+            0.6%
+          </span>
+        </div>
+        
+        <div class="breakdown-row">
+          <span class="breakdown-label">
+            General Merchandise
+            
+          </span>
+          <div class="breakdown-bar-wrap">
+            <div class="breakdown-bar" data-w="0.1" style="width: 0.1%; background: rgb(24, 95, 165);">
+            </div>
+          </div>
+          
+          <span class="breakdown-value">
+            $257.76
+          </span>
+          
+          <span class="breakdown-pct">
+            0.1%
+          </span>
+        </div>
+        
+        <div class="breakdown-row">
+          <span class="breakdown-label">
+            Service
+            
+            <span style="font-size:10px;background:#FCEBEB;color:#A32D2D;padding:1px 6px;border-radius:10px;margin-left:4px">rebate</span>
+            
+          </span>
+          <div class="breakdown-bar-wrap">
+            <div class="breakdown-bar" data-w="1.6" style="width: 1.6%; background: rgb(24, 95, 165);">
+            </div>
+          </div>
+          
+          <span class="breakdown-value" style="color:#A32D2D">
+            -$6,125.45
+          </span>
+          
+          <span class="breakdown-pct">
+            -1.6%
+          </span>
+        </div>
+        
+        <hr>
+        <div class="breakdown-total">
+          <span>Total</span>
+          <span>
+            $384,891.48
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ALERT CARDS ── -->
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="alert-card red h-100" onclick="window.location.href=&#39;/sheet/needs_ordering?job_id=2292753a937e4fff8588d03de9d4ea3e&#39;" style="cursor:pointer">
+          <div class="alert-num">680</div>
+          <div class="alert-title">Drugs need ordering</div>
+          <div class="alert-sub">Est. $8,420 in lost margin</div>
+          <div class="alert-link">View order list</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="alert-card amber h-100" onclick="window.location.href=&#39;/sheet/never_purchased?job_id=2292753a937e4fff8588d03de9d4ea3e&#39;" style="cursor:pointer">
+          <div class="alert-num">548</div>
+          <div class="alert-title">Never purchased — check</div>
+          <div class="alert-sub">$12,300 at risk</div>
+          <div class="alert-link">Investigate now</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="alert-card green h-100" onclick="window.location=&#39;/sheet/do_not_order?job_id=2292753a937e4fff8588d03de9d4ea3e&#39;" style="cursor:pointer">
+          <div class="alert-num">198</div>
+          <div class="alert-title">Drugs overstocked</div>
+          <div class="alert-sub">Do not order these items</div>
+          <div class="alert-link">View do-not-order list</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="alert-card blue h-100" onclick="window.location.href=&#39;/sheet/rx_comparison?job_id=2292753a937e4fff8588d03de9d4ea3e&#39;" style="cursor:pointer">
+          <div class="alert-num">4131</div>
+          <div class="alert-title">Rx comparisons analyzed</div>
+          <div class="alert-sub">47 underpayments detected</div>
+          <div class="alert-link">View full comparison</div>
+        </div>
+      </div>
+    </div>
+
+    
+    <div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <span style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Financial alerts</span>
+          <span style="font-size:12px;color:var(--color-text-secondary);margin-left:8px">Issues requiring attention</span>
+        </div>
+        <span style="background:#FCEBEB;color:#A32D2D;font-size:12px;font-weight:500;padding:4px 12px;border-radius:20px">
+          $9,122 at risk
+        </span>
+      </div>
+
+      <div style="background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:12px;overflow:hidden;cursor:pointer" id="unbilled-card" onclick="toggleUnbilled()">
+        <div style="height:3px;background:#E24B4A"></div>
+        <div style="padding:14px 16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:32px;height:32px;border-radius:8px;background:#FCEBEB;display:flex;align-items:center;justify-content:center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A32D2D" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">Branded drugs purchased but not billed</div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">Purchased from Kinray but no matching Rx found in BestRx</div>
+              </div>
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-left:16px">
+              <div style="font-size:20px;font-weight:500;color:#A32D2D">
+                $9,122
+              </div>
+              <div style="font-size:11px;color:var(--color-text-secondary)">
+                7 drugs · click to view
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-unbilled">
+        <div class="panel-header">
+          <div class="panel-title">Branded drugs purchased but not billed</div>
+          <button class="close-btn" onclick="toggleUnbilled()">×</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="panel-table">
+            <thead>
+              <tr>
+                <th>Drug name</th>
+                <th style="text-align:right">Kinray cost</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              
+              <tr>
+                <td style="font-weight:500">TRADJENTA TB 5MG 30</td>
+                <td style="text-align:right;font-weight:500;color:#A32D2D">
+                  $5,053.90
+                </td>
+                <td>
+                  
+                  <span style="font-size:10px;background:#FCEBEB;color:#A32D2D;padding:2px 7px;border-radius:20px">Investigate</span>
+                  
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="font-weight:500">SHINGRIX SY 50MCG 10X0.5ML PF PFS</td>
+                <td style="text-align:right;font-weight:500;color:#854F0B">
+                  $2,335.67
+                </td>
+                <td>
+                  
+                  <span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:2px 7px;border-radius:20px">Vaccine — billed separately</span>
+                  
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="font-weight:500">ADVAIR DISKUS IN 500-50MCG 60</td>
+                <td style="text-align:right;font-weight:500;color:#A32D2D">
+                  $765.96
+                </td>
+                <td>
+                  
+                  <span style="font-size:10px;background:#FCEBEB;color:#A32D2D;padding:2px 7px;border-radius:20px">Investigate</span>
+                  
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="font-weight:500">ROCKLATAN DR0.02-0.005%2.5ML OPTH</td>
+                <td style="text-align:right;font-weight:500;color:#A32D2D">
+                  $701.10
+                </td>
+                <td>
+                  
+                  <span style="font-size:10px;background:#FCEBEB;color:#A32D2D;padding:2px 7px;border-radius:20px">Investigate</span>
+                  
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="font-weight:500">INS GLARGINE-YFGN MD 100U/ML 10ML</td>
+                <td style="text-align:right;font-weight:500;color:#A32D2D">
+                  $121.22
+                </td>
+                <td>
+                  
+                  <span style="font-size:10px;background:#FCEBEB;color:#A32D2D;padding:2px 7px;border-radius:20px">Investigate</span>
+                  
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="font-weight:500">VRAYLAR CP 4.5MG 30</td>
+                <td style="text-align:right;font-weight:500;color:#A32D2D">
+                  $73.28
+                </td>
+                <td>
+                  
+                  <span style="font-size:10px;background:#FCEBEB;color:#A32D2D;padding:2px 7px;border-radius:20px">Investigate</span>
+                  
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="font-weight:500">HC/ACETIC ACID DR 2-1% 10ML OTIC</td>
+                <td style="text-align:right;font-weight:500;color:#A32D2D">
+                  $70.82
+                </td>
+                <td>
+                  
+                  <span style="font-size:10px;background:#FCEBEB;color:#A32D2D;padding:2px 7px;border-radius:20px">Investigate</span>
+                  
+                </td>
+              </tr>
+              
+            </tbody>
+          </table>
+        </div>
+        <div class="panel-footer">
+          <span>
+            7 drugs ·
+            $6,786 needs investigation (excl. vaccines)
+          </span>
+          <button class="export-sm" onclick="exportUnbilled()">Export CSV</button>
+        </div>
+      </div>
+    </div>
+    
+
+    <script>
+    const EXCEL_DATA = {"do_not_order": {"columns": ["NDC #", "Drug Name", "Pkg Size", "ADAP_D", "ARG/HUM_D", "CVS_D", "ENVISIONRX_D", "ESI_D", "MEDIMP_D", "NAVITUS_D", "NYM_D", "OPTUM_D", "PRIME THER_D", "PRIMECAPRX_D", "TREDIUM_D", "Do Not Order", "Paper Work", "Drug Type"], "count": 198, "rows": [["45802020126", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SUSPENSION", "118", "12", "12", "12", "12", "12", "12", "12", "10", "12", "12", "12", "12", "10", " ", "OTC Drug"], ["00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "4", "4", "3.55", "4", "4", "4", "4", "0.73", "4", "4", "4", "4", "0.73", " ", "OTC Drug"], ["00904673080", "ACETAMINOPHEN EXTRA STRENGTH 500 MG ORAL TABLET", "1000", "3", "3", "3", "3", "3", "3", "3", "2.88", "3", "3", "3", "3", "2.88", " ", "OTC Drug"], ["65162003310", "ACETAMINOPHEN-CODEINE #3 300-30 MG TABLET", "100", "1", "1", "1", "1", "0.93", "1", "1", "1", "1", "1", "1", "1", "0.93", " ", "Generic Drug"], ["68462074635", "ACYCLOVIR 5 % EXTERNAL OINTMENT", "30", "2", "2", "1", "2", "1", "2", "2", "2", "2", "2", "2", "2", "1", " ", "Generic Drug"], ["00173071520", "ADVAIR HFA 45-21 MCG/ACT INHALATION AEROSOL 12GM", "12", "3", "3", "2", "3", "3", "3", "3", "3", "3", "3", "3", "3", "2", " ", "Branded Drug"], ["00310908012", "AIRSUPRA 90-80 MCG/ACT INHALATION AEROSOL", "10.7", "3", "3", "1", "3", "0", "3", "3", "2", "3", "3", "3", "3", "0", " ", "Branded Drug"], ["69097022416", "ALENDRONATE 70MG TAB ", "4", "22", "22", "16", "22", "21", "22", "22", "22", "18", "22", "22", "22", "16", " ", "Generic Drug"], ["64980034001", "ALENDRONATE SODIUM 10 MG ORAL TABLET", "100", "1", "1", "0.1", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0.1", " ", "Generic Drug"], ["69097012815", "AMLODIPINE 10MG TABLET", "1000", "5", "5", "3.47", "5", "4.64", "4.88", "5", "4.61", "4.97", "5", "5", "5", "3.47", " ", "Generic Drug"], ["67877019710", "AMLODIPINE 2.5MG TABLET", "1000", "1", "1", "0.1", "1", "1", "1", "1", "0.91", "1", "1", "1", "1", "0.1", " ", "Generic Drug"], ["69097012715", "AMLODIPINE 5MG TABLET ", "1000", "5", "5", "2.54", "5", "4.7", "4.73", "5", "4.52", "4.61", "5", "4.91", "5", "2.54", " ", "Generic Drug"], ["55111058601", "AMLODIPINE BENAZEPRIL 10-40MG CAPSULE", "100", "2", "2", "2", "2", "2", "2", "2", "1.1", "2", "2", "2", "2", "1.1", " ", "Generic Drug"], ["57237003105", "AMOXICILLIN 500 MG CAPSULE", "500", "1", "1", "0.61", "1", "0.99", "1", "1", "0.82", "0.96", "0.96", "0.97", "1", "0.61", " ", "Generic Drug"], ["57237002801", "AMOXICILLIN 500MG TABLET", "100", "3", "3", "0.43", "3", "2.79", "3", "3", "2.86", "3", "3", "3", "3", "0.43", " ", "Generic Drug"], ["65862001501", "AMOXICILLIN 875 MG TABLET", "100", "1", "1", "0.58", "1", "0.86", "1", "1", "1", "1", "1", "1", "1", "0.58", " ", "Generic Drug"], ["42571016201", "AMOXICILLIN-CLAVULANATE 875-125MG TABLET", "100", "2", "2", "1.76", "2", "2", "2", "2", "1.86", "1.86", "2", "2", "2", "1.76", " ", "Generic Drug"], ["67877043003", "ARIPIPRAZOLE 2MG TABLET", "30", "5", "5", "5", "5", "5", "5", "5", "3", "5", "5", "5", "5", "3", " ", "Generic Drug"], ["00904675180", "ASPIRIN 81MG TABLET DR", "1000", "3", "3", "2.94", "3", "3", "3", "3", "0.27", "2.97", "3", "3", "3", "0.27", " ", "OTC Drug"], ["70710116701", "ATENOLOL-CHLORTHALIDONE 50-25MG TABLET", "100", "2", "2", "0.8", "2", "2", "2", "2", "2", "2", "2", "2", "2", "0.8", " ", "Generic Drug"], ["70377007713", "ATORVASTATIN 10MG TABLET", "1000", "2", "2", "1.07", "2", "1.88", "1.91", "2", "1.82", "1.94", "2", "2", "2", "1.07", " ", "Generic Drug"], ["70377007813", "ATORVASTATIN 20MG TABLET", "1000", "4", "3.94", "1.93", "3.91", "3.82", "4", "3.97", "3.43", "3.91", "4", "3.97", "4", "1.93", " ", "Generic Drug"], ["70377008013", "ATORVASTATIN 80MG  TABLET", "1000", "2", "2", "0.83", "2", "2", "2", "2", "1.82", "1.88", "2", "2", "2", "0.83", " ", "Generic Drug"], ["59651021430", "AZELASTINE HCL 137MCG/SPRAY SOLUTION", "30", "12", "12", "11", "12", "12", "12", "12", "12", "12", "12", "12", "12", "11", " ", "Generic Drug"], ["00172409680", "BACLOFEN 10MG TAB ", "1000", "1", "1", "0.73", "1", "1", "0.85", "1", "0.91", "1", "1", "1", "1", "0.73", " ", "Generic Drug"], ["72888000901", "BACLOFEN 5 MG ORAL TABLET", "100", "2", "2", "1.4", "2", "2", "2", "2", "1.4", "2", "2", "2", "2", "1.4", " ", "Generic Drug"], ["00002771559", "BASAGLAR KWIKPEN 100UNIT/ML INJECTION", "15", "10", "10", "8.8", "10", "8.2", "10", "10", "9.2", "10", "10", "10", "10", "8.2", " ", "Branded Drug"], ["00904674860", "BISACODYL 5MG TABLET DR", "100", "6", "6", "6", "6", "6", "6", "6", "5.76", "6", "6", "6", "6", "5.76", " ", "OTC Drug"], ["00378050501", "BISOPROLOL-HCTZ 10-6.25MG TABLET", "100", "1", "1", "0.1", "1", "1", "1", "1", "0.1", "1", "1", "0.1", "1", "0.1", " ", "Generic Drug"], ["61314014310", "BRIMONIDINE TARTRATE 0.2% SOLUTION", "10", "3", "3", "1", "3", "2", "3", "3", "2", "3", "3", "3", "3", "1", " ", "Generic Drug"], ["61314014305", "BRIMONIDINE TARTRATE 0.2% SOLUTION", "5", "5", "5", "2", "5", "4", "5", "5", "4", "5", "5", "5", "5", "2", " ", "Generic Drug"], ["00093365740", "BUPRENORPHINE 10 MCG/HR TRANSDERMAL PATCH WEEKLY", "4", "2", "2", "1", "2", "2", "2", "2", "2", "2", "2", "2", "2", "1", " ", "Generic Drug"], ["23155002405", "BUSPIRONE 10MG TABLET", "500", "1", "1", "0.58", "1", "1", "1", "1", "0.94", "0.88", "1", "1", "1", "0.58", " ", "Generic Drug"], ["00536133632", "CALCIUM ACETATE (PHOS BINDER) 667 MG ORAL TABLET", "200", "2", "2", "2", "2", "0.65", "2", "2", "2", "2", "2", "2", "2", "0.65", " ", "OTC Drug"], ["54092017312", "CARBATROL 300MG EXT-RELEASE CAPSULE", "120", "1", "1", "1", "1", "1", "1", "1", "0.25", "1", "1", "1", "1", "0.25", " ", "Branded Drug"], ["00093970210", "CARBIDOPA-LEVODOPA 25-100 MG TABLET ", "1000", "1", "1", "0.73", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0.73", " ", "Generic Drug"], ["72888003700", "CARVEDILOL 25 MG TABLET ", "1000", "2", "2", "1.4", "2", "1.82", "2", "2", "1.94", "2", "2", "2", "2", "1.4", " ", "Generic Drug"], ["68382009305", "CARVEDILOL 6.25MG TAB ", "500", "2", "2", "1.16", "2", "2", "2", "2", "2", "2", "2", "2", "2", "1.16", " ", "Generic Drug"], ["00116200116", "CHLORHEXIDINE 0.12% SOLUTION ", "473", "9", "9", "3", "9", "8", "9", "9", "7", "8", "9", "9", "9", "3", " ", "Generic Drug"], ["60505252101", "CILOSTAZOL 50MG TABLET", "60", "3", "3", "1", "3", "3", "3", "3", "3", "3", "3", "3", "3", "1", " ", "Generic Drug"], ["69315030805", "CIPROFLOXACIN HCL 0.3 % OPHTHALMIC SOLUTION", "5", "5", "5", "1", "5", "5", "5", "5", "5", "5", "5", "5", "5", "1", " ", "Generic Drug"], ["69315030810", "CIPROFLOXACIN HCL 0.3 % OPHTHALMIC SOLUTION", "10", "5", "5", "4", "5", "5", "5", "5", "4", "5", "5", "5", "5", "4", " ", "Generic Drug"], ["21922003601", "CLINDAMYCIN PHOSPHATE 1 % EXTERNAL LOTION", "60", "3", "3", "1", "3", "2", "3", "3", "2", "1", "3", "3", "3", "1", " ", "Generic Drug"], ["33342050615", "CLOBETASOL PROPIONATE 0.05 % EXTERNAL OINTMENT", "15", "3", "3", "1", "3", "3", "3", "3", "3", "3", "3", "3", "3", "1", " ", "Generic Drug"], ["59651072299", "CLONAZEPAM 0.5MG TABLET", "1000", "1", "1", "0.95", "1", "1", "1", "1", "0.91", "1", "1", "1", "1", "0.91", " ", "Generic Drug"], ["00093321201", "CLONAZEPAM 1MG TABLET", "100", "2", "2", "1.4", "2", "2", "1.7", "2", "1.1", "2", "2", "2", "2", "1.1", " ", "Generic Drug"], ["43598012105", "CLOPIDOGREL BISULFATE 75 MG ORAL TABLET", "500", "4", "4", "2.92", "4", "3.82", "3.64", "4", "3.64", "4", "4", "4", "4", "2.92", " ", "Generic Drug"], ["00193755301", "CONTOUR NEXT EZ W/DEVICE KIT", "1", "8", "8", "4", "8", "8", "8", "8", "7", "8", "8", "8", "8", "4", " ", "Home Health Care"], ["72888001400", "CYCLOBENZAPRINE 10MG TABLET", "1000", "2", "2", "1.79", "2", "1.91", "2", "2", "1.85", "1.88", "2", "2", "2", "1.79", " ", "Generic Drug"], ["64980050448", "CYPROHEPTADINE HCL 2MG/5ML SYRUP", "473", "2", "2", "1.6", "2", "2", "2", "2", "2", "2", "2", "2", "2", "1.6", " ", "Generic Drug"], ["66993045730", "DAPAGLIFLOZIN PROPANEDIOL 10MG TABLET", "30", "25", "25", "4", "25", "25", "19", "25", "25", "25", "25", "25", "25", "4", " ", "Generic Drug"], ["66993045630", "DAPAGLIFLOZIN PROPANEDIOL 5MG TABLET", "30", "13", "13", "9", "13", "13", "13", "13", "13", "13", "13", "13", "13", "9", " ", "Generic Drug"], ["00074732713", "DEPAKOTE 500MG TABLET DELAYED RELEASE", "100", "1", "1", "1", "1", "1", "1", "1", "0.4", "1", "1", "1", "1", "0.4", " ", "Branded Drug"], ["08627007701", "DEXCOM G7 SENSOR", "1", "10", "10", "10", "10", "7", "10", "10", "1", "7", "10", "10", "10", "1", " ", "Home Health Care"], ["00172392660", "DIAZEPAM 5MG TABLET", "100", "3", "3", "2.88", "3", "3", "3", "3", "3", "3", "3", "3", "3", "2.88", " ", "Generic Drug"], ["00536142704", "DOCOSANOL 10 % EXTERNAL CREAM", "2", "3", "3", "3", "3", "3", "3", "3", "1", "3", "3", "3", "3", "1", " ", "OTC Drug"], ["24208048610", "DORZOLAMID-TIMOLO 22.3-6.8MG/ML (EYE) ", "10", "11", "11", "4", "11", "11", "10", "11", "9", "10", "11", "11", "11", "4", " ", "Generic Drug"], ["72888007715", "DORZOLAMIDE HCL 2 % OPHTHALMIC SOLUTION", "10", "7", "7", "6", "7", "7", "7", "7", "7", "7", "7", "7", "7", "6", " ", "Generic Drug"], ["68180029407", "DULOXETINE 20MG CAPSULE DR", "60", "3", "3", "1.5", "3", "3", "3", "3", "2.5", "3", "3", "3", "3", "1.5", " ", "Generic Drug"], ["23155077310", "ENALAPRIL 20MG TABLET", "1000", "1", "1", "0.88", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0.88", " ", "Generic Drug"], ["31722083330", "ENTECAVIR 0.5 MG ORAL TABLET", "30", "7", "7", "4", "7", "4", "7", "7", "7", "7", "7", "7", "7", "4", " ", "Generic Drug"], ["00093598527", "EPINEPHRINE (JR) 0.15MG/0.3ML", "2", "2", "2", "1", "2", "2", "2", "2", "1", "2", "2", "2", "2", "1", " ", "Generic Drug"], ["24208091055", "ERYTHROMYCIN 5MG/GM OINTMENT", "3.5", "4", "4", "2", "4", "4", "4", "4", "4", "4", "4", "4", "4", "2", " ", "Generic Drug"], ["68180028101", "ETHAMBUTOL HCL 400MG TABLET", "100", "2", "2", "2", "2", "2", "2", "2", "0.38", "2", "2", "2", "2", "0.38", " ", "Generic Drug"], ["70000052201", "EYE ITCH RELIEF 0.025 % OPHTHALMIC SOLUTION", "5", "12", "12", "12", "12", "12", "12", "12", "6", "12", "12", "12", "12", "6", " ", "OTC Drug"], ["67877084210", "FAMOTIDINE 20MG TABLET", "1000", "2", "2", "0.86", "2", "1.73", "2", "2", "1.64", "1.91", "2", "2", "2", "0.86", " ", "Generic Drug"], ["70756005212", "FAMOTIDINE 40MG TABLET", "1000", "2", "2", "1.55", "2", "1.82", "2", "2", "1.94", "2", "2", "2", "2", "1.55", " ", "Generic Drug"], ["00132020140", "FLEET ENEMA 7-19GM/118ML ENEMA", "133", "2", "2", "2", "2", "2", "2", "2", "1", "2", "2", "2", "2", "1", " ", "OTC Drug"], ["57237000511", "FLUCONAZOLE 150MG TAB ", "12", "2", "2", "1", "2", "2", "2", "2", "1.42", "2", "2", "2", "2", "1", " ", "Generic Drug"], ["59651030901", "FLUOXETINE HCL 20MG TABLET", "100", "1", "1", "1", "1", "1", "1", "1", "0.1", "1", "1", "1", "1", "0.1", " ", "Generic Drug"], ["60505082901", "FLUTICASONE 50MCG (NASAL) SUSPENSION", "16", "42", "42", "11", "42", "35", "42", "42", "14", "39", "42", "42", "42", "11", " ", "Generic Drug"], ["00054032756", "FLUTICASONE-SALMETEROL 250-50 MCG/ACT INH AEROSOL", "60", "6", "6", "3", "6", "5", "6", "6", "6", "6", "6", "6", "6", "3", " ", "Generic Drug"], ["69315012710", "FOLIC ACID 1MG TABLET ", "1000", "1", "1", "1", "1", "1", "1", "1", "0.16", "1", "1", "1", "1", "0.16", " ", "Generic Drug"], ["69097085705", "FOSINOPRIL 20MG TAB ", "90", "4", "4", "4", "4", "4", "4", "4", "3", "4", "4", "4", "4", "3", " ", "Generic Drug"], ["99073070914", "FREESTYLE FREEDOM LITE  KIT KINRAY", "1", "4", "4", "3", "4", "4", "4", "4", "4", "4", "4", "4", "4", "3", " ", "Home Health Care"], ["57599081800", "FREESTYLE LIBRE 3 SENSOR", "1", "6", "6", "4", "6", "4", "6", "6", "2", "6", "6", "6", "6", "2", " ", "Home Health Care"], ["99073070822", "FREESTYLE LITE TEST  STRIP", "50", "10", "10", "6", "10", "6", "10", "10", "10", "10", "10", "10", "10", "6", " ", "Home Health Care"], ["69315011710", "FUROSEMIDE 40 MG TABLET", "1000", "1", "1", "1", "1", "0.97", "1", "1", "1", "0.82", "1", "1", "1", "0.82", " ", "Generic Drug"], ["67877022210", "GABAPENTIN 100MG CAPSULE", "1000", "2", "2", "1.24", "2", "1.97", "1.91", "2", "2", "2", "2", "2", "2", "1.24", " ", "Generic Drug"], ["65862052305", "GABAPENTIN 600MG TABLET", "500", "1", "1", "0.64", "1", "1", "1", "1", "0.82", "1", "1", "0.94", "1", "0.64", " ", "Generic Drug"], ["43386009019", "GAVILYTE G SOLUTION ", "4000", "6", "6", "3", "6", "5", "6", "6", "6", "6", "6", "6", "6", "3", " ", "Generic Drug"], ["73336007530", "GEMTESA 75MG TABLET", "30", "7", "7", "1", "7", "7", "6", "7", "7", "7", "7", "7", "7", "1", " ", "Branded Drug"], ["45802005611", "GENTAMICIN SULFATE 0.1% CREAM", "30", "2", "2", "1", "2", "2", "2", "2", "2", "2", "2", "2", "2", "1", " ", "Generic Drug"], ["60505014201", "GLIPIZIDE 10MG TAB ", "1000", "1", "1", "0.34", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0.34", " ", "Generic Drug"], ["68382007901", "HALOPERIDOL 5MG TAB ", "100", "1", "1", "0.4", "1", "1", "1", "1", "1", "1", "1", "1", "1", "0.4", " ", "Generic Drug"], ["45802027603", "HYDROCORTISONE 1 % OINTMENT", "28", "12", "12", "12", "12", "12", "12", "12", "6", "12", "12", "12", "12", "6", " ", "OTC Drug"], ["00168001531", "HYDROCORTISONE 1% CREAM", "28.35", "6", "6", "4", "6", "6", "6", "6", "5", "6", "6", "6", "6", "4", " ", "Generic Drug"], ["00168008031", "HYDROCORTISONE 2.5% CREAM", "30", "10", "10", "7", "10", "10", "10", "10", "8", "10", "10", "10", "10", "7", " ", "Generic Drug"], ["00185067401", "HYDROXYZINE PAMOATE 25 MG ORAL CAPSULE", "100", "2", "2", "0.95", "2", "2", "1.4", "2", "2", "2", "2", "2", "2", "0.95", " ", "Generic Drug"], ["69367039505", "IBUPROFEN 600 MG TABLET", "500", "2", "2", "1.1", "2", "1.63", "1.64", "2", "1.4", "1.95", "2", "1.82", "2", "1.1", " ", "Generic Drug"], ["68462040601", "INDOMETHACIN 25MG CAP ", "100", "1", "1", "1", "1", "1", "1", "1", "0.1", "1", "1", "1", "1", "0.1", " ", "Generic Drug"], ["83257001532", "INSULIN GLARGINE 100 UNIT/ML YFGN", "15", "3", "3", "2.4", "3", "2", "3", "3", "2", "3", "3", "3", "3", "2", " ", "Branded Drug"], ["00378797052", "IPRATROPIUM BROMIDE 0.02 % INHALATION SOLUTION", "62.5", "3", "3", "1", "3", "3", "3", "3", "3", "3", "3", "3", "3", "1", " ", "Generic Drug"], ["82584000330", "IYUZEH 0.005 % OPHTHALMIC SOLUTION", "30", "6", "6", "4", "6", "6", "6", "6", "6", "6", "6", "6", "6", "4", " ", "Branded Drug"], ["00006057561", "JANUMET 50-500 MG ORAL TABLET", "60", "6", "6", "4", "6", "6", "6", "6", "3", "6", "6", "6", "6", "3", " ", "Branded Drug"], ["00006011231", "JANUVIA 50MG TABLET", "30", "15", "15", "12", "15", "14", "12", "15", "12", "15", "15", "15", "15", "12", " ", "Branded Drug"], ["00597015230", "JARDIANCE 10MG TAB ", "30", "38", "38", "16", "38", "35", "37", "38", "30", "35", "38", "38", "38", "16", " ", "Branded Drug"], ["00597015330", "JARDIANCE 25MG TAB ", "30", "36", "36", "7", "36", "29", "35", "36", "27", "36", "36", "36", "36", "7", " ", "Branded Drug"], ["49702024213", "JULUCA 50-25MG TABLET", "30", "2", "2", "1", "2", "2", "2", "2", "1", "2", "2", "2", "2", "1", " ", "Branded Drug"], ["00168009915", "KETOCONAZOLE 2 % EXTERNAL CREAM", "15", "4", "4", "4", "4", "3", "4", "4", "3", "4", "4", "4", "4", "3", " ", "Generic Drug"]]}, "needs_ordering": {"columns": ["NDC #", "Drug Name", "Pkg Size", "ADAP_D", "ARG/HUM_D", "CVS_D", "ENVISIONRX_D", "ESI_D", "MEDIMP_D", "NAVITUS_D", "NYM_D", "OPTUM_D", "PRIME THER_D", "PRIMECAPRX_D", "TREDIUM_D", "To Order", "Paper Work", "PRICE", "Total Order Price", "Insurance-wise Order Estimate ($)", "Amount"], "count": 680, "rows": [["70000035801", "A\u0026D EXTERNAL OINTMENT", "425", "0", "0", "0", "0", "0", "0", "0", "-1", "0", "0", "0", "0", "1", " ", "0", "0", "ADAP_D", ""], ["65702028810", "ACCU-CHEK FASTCLIX LANCETS", "102", "0", "0", "-0.98", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0.98", " ", "0", "0", "ARG/HUM_D", ""], ["65702071110", "ACCU-CHEK GUIDE IN VITRO STRIP", "50", "4", "4", "-4", "4", "0", "4", "4", "4", "4", "4", "4", "4", "4", " ", "20", "80", "CVS_D", ""], ["65702072910", "ACCU-CHEK GUIDE W/DEVICE KIT", "1", "0", "0", "0", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "ENVISIONRX_D", ""], ["50924097110", "ACCU-CHEK SOFTCLIX LANCETS", "100", "0", "0", "-3", "0", "0", "0", "0", "0", "0", "0", "0", "0", "3", " ", "0", "0", "ESI_D", ""], ["45802073230", "ACETAMINOPHEN 120 MG RECTAL SUPPOSITORY", "12", "0", "0", "0", "0", "0", "0", "0", "-1", "0", "0", "0", "0", "1", " ", "0", "0", "MEDIMP_D", ""], ["69367032304", "ACETAMINOPHEN 160 MG/5ML LIQUID ***** NYM", "118", "0", "0", "0", "0", "0", "0", "0", "-1", "0", "0", "0", "0", "1", " ", "0", "0", "NAVITUS_D", ""], ["57237030412", "ACETAMINOPHEN 160 MG/5ML ORAL SOLUTION", "118", "0", "0", "0", "0", "0", "0", "0", "-2.17", "0", "0", "0", "0", "2.17", " ", "0", "0", "NYM_D", ""], ["00536132701", "ACETAMINOPHEN 325 MG TABLET * TYLENOL REGULAR", "100", "0", "0", "0", "0", "0", "0", "0", "-2.8", "0", "0", "0", "0", "2.8", " ", "0", "0", "OPTUM_D", ""], ["00536132710", "ACETAMINOPHEN 325MG TABLET", "1000", "0", "0", "-0.12", "0", "-0.03", "0", "0", "-0.57", "0", "0", "0", "0", "0.57", " ", "0", "0", "PRIME THER_D", ""], ["00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "0", "0", "-0.06", "0", "0", "0", "0", "-1.54", "0", "0", "0", "0", "1.54", " ", "0", "0", "PRIMECAPRX_D", ""], ["00904701420", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SOLUTION", "118", "0", "0", "0", "0", "0", "0", "0", "-17", "0", "0", "0", "0", "17", " ", "0", "0", "TREDIUM_D", ""], ["00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "1", "1", "1", "1", "1", "1", "1", "-2.59", "1", "1", "1", "1", "2.59", " ", "8", "20.75", "OTC Drug", ""], ["50242014301", "ACTEMRA ACTPEN 162 MG/0.9ML SUBCUTANEOUS SOLUTION AUTO-INJECTOR", "0.9", "0", "0", "0", "0", "0", "0", "0", "-2", "0", "0", "0", "0", "2", " ", "0", "0", "Unclassified", ""], ["31722077705", "ACYCLOVIR 400 MG TABLET", "500", "0", "0", "0", "0", "0", "0", "0", "-0.12", "0", "0", "0", "0", "0.12", " ", "0", "0", "Unclassified", ""], ["00173069600", "ADVAIR DISKUS 250-50MCG/DOSE AEROSOL 60EA", "60", "0", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["00173071720", "ADVAIR HFA 230-21 MCG/ACT INHALATION AEROSOL", "12", "0", "0", "0", "0", "0", "0", "0", "-1", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["66993001968", "ALBUTEROL HFA 108  MCG/AC (VENTOLIN 18GM) ", "18", "12", "12", "-10", "12", "12", "12", "12", "12", "12", "12", "12", "12", "10", " ", "41", "410", "Generic Drug", ""], ["47335070352", "ALBUTEROL SULFATE (2.5 MG/3ML) 0.083% INHALATION NEBULIZATION SOLUTION", "90", "0", "0", "0", "0", "0", "0", "0", "-1", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["76204020030", "ALBUTEROL SULFATE (2.5 MG/3ML) 0.083% INHALATION NEBULIZATION SOLUTION", "90", "0", "0", "-5", "0", "0", "0", "0", "-10", "0", "0", "0", "0", "10", " ", "0", "0", "Unclassified", ""], ["00378705752", "ALBUTEROL SULFATE 0.63 MG/3ML INHALATION NEBULIZATION SOLUTION", "75", "0", "0", "0", "0", "0", "0", "0", "-1", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["00378705852", "ALBUTEROL SULFATE 1.25 MG/3ML INHALATION NEBULIZATION SOLUTION", "75", "0", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["68180096301", "ALBUTEROL SULFATE HFA 108 (90 BASE)MCG/ACT AEROSOL", "8.5", "36", "36", "12", "33", "30", "35", "36", "-7", "35", "36", "36", "36", "7", " ", "13", "91", "Generic Drug", ""], ["91237000128", "ALCOHOL PADS EASY COMFORT  ALPINE ", "100", "0", "0", "0", "0", "-2", "0", "0", "-1", "0", "0", "0", "0", "2", " ", "0", "0", "Unclassified", ""], ["08222440006", "ALCOHOL PADS ULTICARE", "100", "0", "0", "-34", "0", "-1", "0", "0", "-8", "-2", "0", "0", "0", "34", " ", "0", "0", "Unclassified", ""], ["00536110301", "ALCOHOL PREP 70 % PAD CVS", "100", "0", "0", "-3", "0", "0", "0", "0", "0", "0", "0", "0", "0", "3", " ", "0", "0", "Unclassified", ""], ["29300015501", "ALFUZOSIN HCL ER 10 MG TABLET", "100", "0", "0", "-3.91", "0", "0", "0", "0", "0", "0", "0", "0", "0", "3.91", " ", "0", "0", "Unclassified", ""], ["00378013710", "ALLOPURINOL 100 MG TABLET", "1000", "0", "0", "-0.15", "0", "0", "0", "0", "-0.03", "0", "0", "0", "0", "0.15", " ", "0", "0", "Unclassified", ""], ["55111073005", "ALLOPURINOL 300 MG TABLET", "500", "0", "0", "-0.24", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0.24", " ", "0", "0", "Unclassified", ""], ["45802010365", "ALOGLIPTIN BENZOATE 12.5 MG ORAL TABLET", "30", "0", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["65862067901", "ALPRAZOLAM 2 MG ORAL TABLET", "100", "0", "0", "0", "0", "0", "0", "0", "-0.75", "0", "0", "0", "0", "0.75", " ", "0", "0", "Unclassified", ""], ["70700011685", "ALTAVERA 0.15-30MG TABLET", "28", "2", "2", "-1", "2", "2", "2", "2", "2", "2", "2", "2", "2", "1", " ", "14", "14", "Generic Drug", ""], ["00832011150", "AMANTADINE 100MG TABLET", "500", "0", "0", "-0.06", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0.06", " ", "0", "0", "Unclassified", ""], ["57664068788", "AMITRIPTYLINE 10 MG TABLET", "100", "0", "0", "0", "0", "0", "0", "0", "-0.9", "0", "0", "0", "0", "0.9", " ", "0", "0", "Unclassified", ""], ["16729017201", "AMITRIPTYLINE 25MG TAB ", "100", "0", "0", "0", "0", "0", "0", "0", "-0.3", "0", "0", "0", "0", "0.3", " ", "0", "0", "Unclassified", ""], ["16571010610", "AMITRIPTYLINE 25MG TABLET", "1000", "0", "0", "0", "0", "0", "0", "0", "0", "-0.03", "0", "0", "0", "0.03", " ", "0", "0", "Unclassified", ""], ["16571010701", "AMITRIPTYLINE HCL 50 MG ORAL TABLET", "100", "0", "0", "-0.3", "0", "0", "0", "0", "-0.3", "0", "0", "0", "0", "0.3", " ", "0", "0", "Unclassified", ""], ["57664069288", "AMITRIPTYLINE HCL 75MG TABLET", "100", "0", "0", "-0.9", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0.9", " ", "0", "0", "Unclassified", ""], ["00904637161", "AMLODIPINE BESYLATE 10 MG ORAL TABLET", "100", "0", "0", "0", "0", "0", "-0.6", "0", "0", "0", "0", "0", "0", "0.6", " ", "0", "0", "Unclassified", ""], ["00378172493", "AMLODIPINE VALSARTAN 10-320MG TABLET", "30", "0", "0", "-3", "0", "0", "0", "0", "0", "0", "0", "0", "0", "3", " ", "0", "0", "Unclassified", ""], ["65862058305", "AMLODIPINE-BENAZEPRIL 5-10MG CAPSULE", "500", "0", "0", "0", "0", "0", "0", "0", "-0.18", "0", "0", "0", "0", "0.18", " ", "0", "0", "Unclassified", ""], ["68180045901", "AMLODIPINE-BENAZEPRIL 5-20MG CAPSULE", "100", "0", "0", "0", "0", "0", "-0.3", "0", "0", "0", "0", "0", "0", "0.3", " ", "0", "0", "Unclassified", ""], ["00378172193", "AMLODIPINE-VALSARTAN 5-160 MG TABLET", "30", "0", "0", "0", "0", "0", "0", "0", "-3", "0", "0", "0", "0", "3", " ", "0", "0", "Unclassified", ""], ["64380019801", "AMLODIPINE-VALSARTAN-HCTZ 5-160-25 MG ORAL TABLET", "30", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "-1", "0", "1", " ", "0", "0", "Unclassified", ""], ["51672130100", "AMMONIUM LACTATE 12 % EXTERNAL CREAM", "385", "0", "0", "-5", "0", "-2", "-1", "0", "0", "0", "0", "0", "0", "5", " ", "0", "0", "Unclassified", ""], ["51672130104", "AMMONIUM LACTATE 12 % EXTERNAL CREAM", "280", "0", "0", "-3.5", "0", "0", "-1.5", "0", "0", "0", "0", "0", "0", "3.5", " ", "0", "0", "Unclassified", ""], ["51672130009", "AMMONIUM LACTATE 12 % EXTERNAL LOTION", "400", "0", "0", "-8", "0", "-4", "-1", "0", "0", "-1", "0", "0", "0", "8", " ", "0", "0", "Unclassified", ""], ["51672130005", "AMMONIUM LACTATE 12 % EXTERNAL LOTION", "225", "0", "0", "-2", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "2", " ", "0", "0", "Unclassified", ""], ["00093416173", "AMOXICILLIN 400MG/5ML FOR SUSPENSION", "100", "0", "0", "0", "0", "0", "0", "0", "-3", "0", "0", "0", "0", "3", " ", "0", "0", "Unclassified", ""], ["00093227434", "AMOXICILLIN-CLAVULANATE 500-125MG TABLET", "20", "0", "0", "-2.2", "0", "0", "0", "0", "0", "0", "0", "0", "0", "2.2", " ", "0", "0", "Unclassified", ""], ["00143924920", "AMOXICILLIN-POT CLAVULANATE 875-125 MG TABLET ", "20", "0", "0", "-1.7", "0", "0", "0", "0", "0", "-0.7", "0", "0", "0", "1.7", " ", "0", "0", "Unclassified", ""], ["00555097402", "AMPHETAMINE-DEXTROAMPHETAMINE 30 MG ORAL TABLET", "100", "0", "0", "0", "0", "-0.3", "0", "0", "0", "0", "0", "0", "0", "0.3", " ", "0", "0", "Unclassified", ""], ["16729003510", "ANASTROZOLE 1MG TABLET", "30", "0", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["43598096830", "ARIPIPRAZOLE 15MG TABLET", "30", "0", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["67877043405", "ARIPIPRAZOLE 20 MG ORAL TABLET", "500", "0", "0", "-0.06", "0", "-0.06", "0", "0", "-0.06", "0", "0", "0", "0", "0.06", " ", "0", "0", "Unclassified", ""], ["65162089603", "ARIPIPRAZOLE 2MG TABLET ", "30", "0", "0", "0", "0", "0", "0", "0", "-1", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["67877043103", "ARIPIPRAZOLE 5MG TABLET", "30", "0", "0", "0", "0", "0", "0", "0", "-1", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["00173088810", "ARNUITY ELLIPTA 50 MCG/ACT INHAEROSOL", "30", "0", "0", "-1", "0", "0", "0", "0", "-1", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["00904404073", "ASPIRIN 81 MG ORAL TABLET CHEWABLE", "36", "0", "0", "0", "0", "0", "0", "0", "-3.33", "0", "0", "-0.83", "0", "3.33", " ", "0", "0", "Unclassified", ""], ["00904679480", "ASPIRIN LOW DOSE 81 MG TABLET CHEWABLE", "1000", "0", "0", "0", "0", "0", "0", "0", "-0.03", "0", "0", "0", "0", "0.03", " ", "0", "0", "Unclassified", ""], ["65862017099", "ATENOLOL 100 MG TABLET", "1000", "0", "0", "-0.18", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0.18", " ", "0", "0", "Unclassified", ""], ["65862016999", "ATENOLOL 50MG TABLET", "1000", "0", "0", "0", "0", "0", "-0.09", "0", "0", "0", "0", "0", "0", "0.09", " ", "0", "0", "Unclassified", ""], ["70710116801", "ATENOLOL-CHLORTHALIDONE 100-25 MG TABLET", "100", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "-0.9", "0", "0.9", " ", "0", "0", "Unclassified", ""], ["70377007913", "ATORVASTATIN 40MG TABLET", "1000", "2", "2", "-1.21", "2", "1.37", "1.91", "2", "1.19", "1.79", "2", "2", "2", "1.21", " ", "33", "39.93", "Generic Drug", ""], ["63304082990", "ATORVASTATIN CALCIUM 40MG TABLET", "90", "0", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["31722062921", "ATOVAQUONE 750 MG/5ML ORAL SUSPENSION", "210", "1", "1", "0", "1", "1", "1", "1", "-0.43", "1", "1", "1", "1", "0.43", " ", "132", "56.57", "Generic Drug", ""], ["60219174903", "ATROPINE SULFATE 1 % OPHTHALMIC SOLUTION", "5", "0", "0", "-1", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["51672138903", "AZELAIC ACID 15 % EXTERNAL GEL", "50", "0", "0", "0", "0", "0", "0", "0", "0", "-1", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["60505057804", "AZELASTINE 0.05% OPHTHALMIC SOLUTION", "6", "0", "0", "-4", "0", "0", "0", "0", "-1", "0", "0", "0", "0", "4", " ", "0", "0", "Unclassified", ""], ["65162067684", "AZELASTINE HCL 137 MCG/SPRAY NASAL SOLUTION", "30", "0", "0", "-4", "0", "0", "0", "0", "-1", "-1", "0", "0", "0", "4", " ", "0", "0", "Unclassified", ""], ["68180086106", "AZITHROMYCIN 250 MG ORAL TABLET", "30", "0", "0", "0", "0", "0", "0", "0", "-0.67", "0", "0", "0", "0", "0.67", " ", "0", "0", "Unclassified", ""], ["68180086111", "AZITHROMYCIN 250 MG TABLET", "6", "0", "0", "0", "0", "-1", "0", "0", "-2", "0", "0", "0", "0", "2", " ", "0", "0", "Unclassified", ""], ["00781809003", "AZITHROMYCIN 500MG TAB", "3", "0", "0", "-3.33", "0", "0", "0", "0", "0", "0", "0", "0", "0", "3.33", " ", "0", "0", "Unclassified", ""], ["00172409760", "BACLOFEN 20MG TABLET", "100", "0", "0", "-0.3", "0", "0", "0", "0", "-0.3", "0", "0", "0", "0", "0.3", " ", "0", "0", "Unclassified", ""], ["00904555159", "BANOPHEN 25 MG TABLET", "100", "0", "0", "0", "0", "0", "0", "0", "-0.44", "0", "0", "0", "0", "0.44", " ", "0", "0", "Unclassified", ""], ["00904723780", "BANOPHEN 25MG CAPSULE", "1000", "0", "0", "0", "0", "0", "0", "0", "-0.08", "0", "0", "0", "0", "0.08", " ", "0", "0", "Unclassified", ""], ["23155075001", "BENAZEPRIL HCL 10 MG ORAL TABLET", "100", "0", "0", "-0.9", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0.9", " ", "0", "0", "Unclassified", ""], ["00574022901", "BENAZEPRIL-HCTZ 20-12.5MG TABLET", "100", "0", "0", "-0.9", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0.9", " ", "0", "0", "Unclassified", ""], ["62559041701", "BENAZEPRIL-HYDROCHLOROTHIAZIDE 20-25 MG TABLET", "100", "0", "0", "0", "0", "-0.3", "0", "0", "0", "0", "0", "0", "0", "0.3", " ", "0", "0", "Unclassified", ""], ["42806071405", "BENZONATATE 100MG CAPSULE NYM", "500", "0", "0", "0", "0", "0", "0", "0", "-0.52", "0", "0", "0", "0", "0.52", " ", "0", "0", "Unclassified", ""], ["42806071501", "BENZONATATE 200MG CAPSULE", "100", "0", "0", "0", "0", "0", "0", "0", "-1.01", "0", "0", "0", "0", "1.01", " ", "0", "0", "Unclassified", ""], ["45802021696", "BENZOYL PEROXIDE 5 % EXTERNAL GEL", "60", "0", "0", "0", "0", "0", "0", "0", "-2", "0", "0", "0", "0", "2", " ", "0", "0", "Unclassified", ""], ["00713032637", "BETAMETHASONE VALERATE 0.1% CREAM", "45", "0", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["29300012601", "BISOPROLOL 5MG TABLET", "100", "0", "0", "-1.8", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1.8", " ", "0", "0", "Unclassified", ""], ["52817026830", "BISOPROLOL FUMARATE 2.5 MG ORAL TABLET", "30", "0", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["70954045520", "BISOPROLOL FUMARATE 5 MG ORAL TABLET", "100", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "-0.3", "0", "0.3", " ", "0", "0", "Unclassified", ""], ["00378050101", "BISOPROLOL-HYDROCHLOROTHIAZIDE 2.5-6.25 MG ORAL TABLET", "100", "0", "0", "-0.9", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0.9", " ", "0", "0", "Unclassified", ""], ["91237000178", "BLOOD PRESSURE MACHINE ***  *TALKING SENSE", "1", "0", "0", "0", "0", "0", "0", "0", "-5", "0", "0", "0", "0", "5", " ", "0", "0", "Unclassified", ""], ["00173085910", "BREO ELLIPTA 100-25 MCG/ACT INH AEROSOL", "60", "4", "4", "-1", "4", "3", "4", "4", "4", "4", "4", "4", "4", "1", " ", "392", "392", "Branded Drug", ""], ["00173088210", "BREO ELLIPTA 200-25MCG/INH AEROSOL 60EA", "60", "0", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["61314014315", "BRIMONIDINE TARTRATE 0.2 % OPHTHALMIC SOLUTION", "15", "3", "3", "-2", "3", "3", "3", "3", "1", "3", "3", "3", "3", "2", " ", "8", "16", "Generic Drug", ""], ["72266014201", "BROMFENAC SODIUM (ONCE-DAILY) 0.09% SOLUTION", "1.7", "0", "0", "-1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "1", " ", "0", "0", "Unclassified", ""], ["00093681655", "BUDESONIDE 0.5 MG/2ML INHALATION SUSPENSION", "60", "0", "0", "0", "0", "-2", "0", "0", "0", "0", "0", "0", "0", "2", " ", "0", "0", "Unclassified", ""], ["00093681673", "BUDESONIDE 0.5MG/2ML INHALATION SUSPENSION", "60", "0", "0", "-2", "0", "0", "0", "0", "0", "0", "0", "0", "0", "2", " ", "0", "0", "Unclassified", ""], ["00310737020", "BUDESONIDE/FORMOTEROL 160 /4.5 MCG (SYMBICORT)", "10.2", "2", "2", "-4", "2", "0", "-1", "2", "2", "2", "2", "2", "2", "4", " ", "180", "720", "Generic Drug", ""], ["00185012801", "BUMETANIDE 0.5 MG ORAL TABLET", "100", "0", "0", "-0.9", "0", "0", "0", "0", "-0.45", "0", "0", "0", "0", "0.9", " ", "0", "0", "Unclassified", ""], ["60505015801", "BUPROPION HCL 75MG TABLET", "100", "0", "0", "0", "0", "0", "0", "0", "-0.6", "0", "0", "0", "0", "0.6", " ", "0", "0", "Unclassified", ""], ["70436005801", "BUPROPION HCL ER (SR) 100MG TABLET", "100", "0", "0", "0", "0", "0", "0", "0", "0", "-0.3", "0", "0", "0", "0.3", " ", "0", "0", "Unclassified", ""], ["50228017501", "BUPROPION HCL ER (SR) 150 MG ORAL TABLET EXTENDED RELEASE 12 HOUR", "100", "0", "0", "0", "0", "0", "0", "0", "0", "-0.3", "0", "0", "0", "0.3", " ", "0", "0", "Unclassified", ""], ["68180031902", "BUPROPION HCL ER (XL) 150MG", "500", "0", "0", "-0.06", "0", "0", "-0.06", "0", "-0.18", "-0.06", "0", "0", "0", "0.18", " ", "0", "0", "Unclassified", ""]]}, "never_purchased": {"columns": ["Drug Name", "NDC #", "Pkg Size", "Total Purchased", "ALL_PBM_P"], "count": 548, "rows": [["ACCU-CHEK GUIDE W/DEVICE KIT", "65702072910", "1", "0", "1"], ["ACTEMRA ACTPEN 162 MG/0.9ML SUBCUTANEOUS SOLUTION AUTO-INJECTOR", "50242014301", "0.9", "0", "2"], ["ACYCLOVIR 400 MG TABLET", "31722077705", "500", "0", "0.12"], ["ADVAIR DISKUS 250-50MCG/DOSE AEROSOL 60EA", "00173069600", "60", "0", "1"], ["ADVAIR HFA 230-21 MCG/ACT INHALATION AEROSOL", "00173071720", "12", "0", "1"], ["ALBUTEROL SULFATE (2.5 MG/3ML) 0.083% INHALATION NEBULIZATION SOLUTION", "47335070352", "90", "0", "1"], ["ALBUTEROL SULFATE (2.5 MG/3ML) 0.083% INHALATION NEBULIZATION SOLUTION", "76204020030", "90", "0", "15"], ["ALBUTEROL SULFATE 0.63 MG/3ML INHALATION NEBULIZATION SOLUTION", "00378705752", "75", "0", "1"], ["ALBUTEROL SULFATE 1.25 MG/3ML INHALATION NEBULIZATION SOLUTION", "00378705852", "75", "0", "1"], ["ALCOHOL PADS EASY COMFORT  ALPINE ", "91237000128", "100", "0", "3"], ["ALCOHOL PADS ULTICARE", "08222440006", "100", "0", "45"], ["ALFUZOSIN HCL ER 10 MG TABLET", "29300015501", "100", "0", "3.91"], ["ALLOPURINOL 100 MG TABLET", "00378013710", "1000", "0", "0.18"], ["ALLOPURINOL 300 MG TABLET", "55111073005", "500", "0", "0.24"], ["ALOGLIPTIN BENZOATE 12.5 MG ORAL TABLET", "45802010365", "30", "0", "1"], ["ALPRAZOLAM 2 MG ORAL TABLET", "65862067901", "100", "0", "0.75"], ["AMANTADINE 100MG TABLET", "00832011150", "500", "0", "0.06"], ["AMITRIPTYLINE 10 MG TABLET", "57664068788", "100", "0", "0.9"], ["AMITRIPTYLINE 25MG TAB ", "16729017201", "100", "0", "0.3"], ["AMITRIPTYLINE 25MG TABLET", "16571010610", "1000", "0", "0.03"], ["AMITRIPTYLINE HCL 50 MG ORAL TABLET", "16571010701", "100", "0", "0.6"], ["AMITRIPTYLINE HCL 75MG TABLET", "57664069288", "100", "0", "0.9"], ["AMLODIPINE BESYLATE 10 MG ORAL TABLET", "00904637161", "100", "0", "0.6"], ["AMLODIPINE VALSARTAN 10-320MG TABLET", "00378172493", "30", "0", "3"], ["AMLODIPINE-BENAZEPRIL 5-10MG CAPSULE", "65862058305", "500", "0", "0.18"], ["AMLODIPINE-BENAZEPRIL 5-20MG CAPSULE", "68180045901", "100", "0", "0.3"], ["AMLODIPINE-VALSARTAN 5-160 MG TABLET", "00378172193", "30", "0", "3"], ["AMLODIPINE-VALSARTAN-HCTZ 5-160-25 MG ORAL TABLET", "64380019801", "30", "0", "1"], ["AMMONIUM LACTATE 12 % EXTERNAL CREAM", "51672130100", "385", "0", "8"], ["AMMONIUM LACTATE 12 % EXTERNAL CREAM", "51672130104", "280", "0", "5"], ["AMMONIUM LACTATE 12 % EXTERNAL LOTION", "51672130009", "400", "0", "14"], ["AMMONIUM LACTATE 12 % EXTERNAL LOTION", "51672130005", "225", "0", "3"], ["AMOXICILLIN 400MG/5ML FOR SUSPENSION", "00093416173", "100", "0", "3"], ["AMOXICILLIN-CLAVULANATE 500-125MG TABLET", "00093227434", "20", "0", "2.2"], ["AMOXICILLIN-POT CLAVULANATE 875-125 MG TABLET ", "00143924920", "20", "0", "2.4"], ["AMPHETAMINE-DEXTROAMPHETAMINE 30 MG ORAL TABLET", "00555097402", "100", "0", "0.3"], ["ANASTROZOLE 1MG TABLET", "16729003510", "30", "0", "1"], ["ARIPIPRAZOLE 15MG TABLET", "43598096830", "30", "0", "1"], ["ARIPIPRAZOLE 20 MG ORAL TABLET", "67877043405", "500", "0", "0.18"], ["ARIPIPRAZOLE 2MG TABLET ", "65162089603", "30", "0", "1"], ["ARIPIPRAZOLE 5MG TABLET", "67877043103", "30", "0", "1"], ["ARNUITY ELLIPTA 50 MCG/ACT INHAEROSOL", "00173088810", "30", "0", "2"], ["ATENOLOL 100 MG TABLET", "65862017099", "1000", "0", "0.18"], ["ATENOLOL 50MG TABLET", "65862016999", "1000", "0", "0.09"], ["ATENOLOL-CHLORTHALIDONE 100-25 MG TABLET", "70710116801", "100", "0", "0.9"], ["ATORVASTATIN CALCIUM 40MG TABLET", "63304082990", "90", "0", "1"], ["ATROPINE SULFATE 1 % OPHTHALMIC SOLUTION", "60219174903", "5", "0", "2"], ["AZELAIC ACID 15 % EXTERNAL GEL", "51672138903", "50", "0", "1"], ["AZELASTINE 0.05% OPHTHALMIC SOLUTION", "60505057804", "6", "0", "5"], ["AZELASTINE HCL 137 MCG/SPRAY NASAL SOLUTION", "65162067684", "30", "0", "6"], ["AZITHROMYCIN 250 MG ORAL TABLET", "68180086106", "30", "0", "0.67"], ["AZITHROMYCIN 250 MG TABLET", "68180086111", "6", "0", "3"], ["AZITHROMYCIN 500MG TAB", "00781809003", "3", "0", "3.33"], ["BACLOFEN 20MG TABLET", "00172409760", "100", "0", "0.6"], ["BENAZEPRIL HCL 10 MG ORAL TABLET", "23155075001", "100", "0", "0.9"], ["BENAZEPRIL-HCTZ 20-12.5MG TABLET", "00574022901", "100", "0", "0.9"], ["BENAZEPRIL-HYDROCHLOROTHIAZIDE 20-25 MG TABLET", "62559041701", "100", "0", "0.3"], ["BENZONATATE 100MG CAPSULE NYM", "42806071405", "500", "0", "0.52"], ["BENZONATATE 200MG CAPSULE", "42806071501", "100", "0", "1.01"], ["BETAMETHASONE VALERATE 0.1% CREAM", "00713032637", "45", "0", "1"], ["BISOPROLOL 5MG TABLET", "29300012601", "100", "0", "1.8"], ["BISOPROLOL FUMARATE 2.5 MG ORAL TABLET", "52817026830", "30", "0", "1"], ["BISOPROLOL FUMARATE 5 MG ORAL TABLET", "70954045520", "100", "0", "0.3"], ["BISOPROLOL-HYDROCHLOROTHIAZIDE 2.5-6.25 MG ORAL TABLET", "00378050101", "100", "0", "0.9"], ["BLOOD PRESSURE MACHINE ***  *TALKING SENSE", "91237000178", "1", "0", "5"], ["BREO ELLIPTA 200-25MCG/INH AEROSOL 60EA", "00173088210", "60", "0", "1"], ["BROMFENAC SODIUM (ONCE-DAILY) 0.09% SOLUTION", "72266014201", "1.7", "0", "1"], ["BUDESONIDE 0.5 MG/2ML INHALATION SUSPENSION", "00093681655", "60", "0", "2"], ["BUDESONIDE 0.5MG/2ML INHALATION SUSPENSION", "00093681673", "60", "0", "2"], ["BUMETANIDE 0.5 MG ORAL TABLET", "00185012801", "100", "0", "1.35"], ["BUPROPION HCL 75MG TABLET", "60505015801", "100", "0", "0.6"], ["BUPROPION HCL ER (SR) 100MG TABLET", "70436005801", "100", "0", "0.3"], ["BUPROPION HCL ER (SR) 150 MG ORAL TABLET EXTENDED RELEASE 12 HOUR", "50228017501", "100", "0", "0.3"], ["BUPROPION HCL ER (XL) 150MG", "68180031902", "500", "0", "0.36"], ["BUPROPION HCL ER (XL) 300MG TABLET", "69097007212", "500", "0", "0.6"], ["BUSPIRONE HCL 30 MG ORAL TABLET", "72888006605", "500", "0", "0.12"], ["BUSPIRONE HCL 7.5MG TABLET", "72888006301", "100", "0", "1.8"], ["BUTALBITAL-APAP-CAFFEINE 50-325-40 MG ORAL TABLET", "70010014901", "100", "0", "1.8"], ["CALCIUM CARBONATE 500MG TABLET CHEWABLE", "00536100715", "150", "0", "1.4"], ["CANDESARTAN CILEXETIL 8 MG ORAL TABLET", "62332034290", "90", "0", "1"], ["CANDESARTAN CILEXETIL-HCTZ 32-12.5 MG ORAL TABLET", "43547046009", "90", "0", "1"], ["CARVEDILOL 12.5MG TABLET", "72888003600", "1000", "0", "0.3"], ["CARVEDILOL 3.125MG TAB ", "68382009205", "500", "0", "1.02"], ["CEFADROXIL 500 MG ORAL CAPSULE", "00093319601", "100", "0", "0.32"], ["CEFDINIR 300MG CAPSULE", "00093316006", "60", "0", "0.23"], ["CEFPODOXIME 100MG TAB ", "65862009520", "20", "0", "0.7"], ["CEFPODOXIME 200MG TAB ", "00781543920", "20", "0", "1.4"], ["CELECOXIB 100MG CAP ", "69097042207", "100", "0", "1.8"], ["CELECOXIB 200 MG ORAL CAPSULE", "69097042112", "500", "0", "0.3"], ["CEPHALEXIN 500MG CAPSULE ", "67877021905", "500", "0", "0.12"], ["CETIRIZINE HCL 1 MG/ML ORAL SOLUTION", "51672407008", "120", "0", "3"], ["CEVIMELINE 30MG CAP ", "16571065710", "100", "0", "0.9"], ["CHLORTHALIDONE 25MG TABLET", "70756001112", "1000", "0", "0.51"], ["CHLORZOXAZONE 375 MG ORAL TABLET", "59651030501", "100", "0", "0.9"], ["CICLOPIROX 0.77 % EXTERNAL SUSPENSION", "45802040049", "30", "0", "5"], ["CICLOPIROX 0.77% CREAM ", "51672131802", "30", "0", "2"], ["CICLOPIROX 1 % EXTERNAL SHAMPOO", "45802040109", "120", "0", "2"], ["CICLOPIROX 8 % EXTERNAL SOLUTION", "42192071506", "6.6", "0", "5"], ["CIPROFLOXACIN 500MG TABLET", "00143992801", "100", "0", "0.48"], ["CIPROFLOXACIN-DEXA 0.3-0.1% OTIC SUSP (EAR)", "43598032675", "7.5", "0", "1"]]}, "rx_comparison": {"columns": ["RX", "Fill Date", "NDC", "Drug Name", "Pkg Size", "Qty Filled", "Package Billed", "Kinray Final Price", "Ins Paid", "SDRA Amt", "COPAY", "Total = (Ins Paid + SDRA + COPAY)", "Difference", "BIN", "Processor", "PCN", "Group"], "count": 4131, "rows": [["137902", "2026-03-04 00:00:00", "70000035801", "A\u0026D EXTERNAL OINTMENT", "425", "425", "1", "0", "12.01", "0", "0", "12.01", "0", "004740", "NYM", "9314DA31", ""], ["144533", "2026-03-24 00:00:00", "59148000713", "ABILIFY 5MG TABLET", "30", "30", "1", "562", "570.94", "0", "0", "570.94", "8.94", "004740", "NYM", "9314DA31", ""], ["148619", "2026-03-23 00:00:00", "65702028810", "ACCU-CHEK FASTCLIX LANCETS", "102", "100", "0.98", "0", "12.08", "0", "0", "12.08", "0", "004336", "CVS", "ADV", "RX1108"], ["121030", "2026-03-02 00:00:00", "65702071110", "ACCU-CHEK GUIDE IN VITRO STRIP", "50", "200", "4", "80", "78.43", "0", "0", "78.43", "-1.57", "610502", "CVS", "MEDDAET", "RXAETD"], ["147562", "2026-03-16 00:00:00", "65702071110", "ACCU-CHEK GUIDE IN VITRO STRIP", "50", "200", "4", "80", "57.22", "0", "14.3", "71.52", "-8.48", "610014", "ESI", "MEDDPRIME", "2FFA"], ["141797", "2026-03-04 00:00:00", "65702071110", "ACCU-CHEK GUIDE IN VITRO STRIP", "50", "100", "2", "40", "39.07", "0", "0", "39.07", "-0.93", "610502", "CVS", "MEDDAET", "RXAETD"], ["107242", "2026-03-09 00:00:00", "65702071110", "ACCU-CHEK GUIDE IN VITRO STRIP", "50", "100", "2", "40", "39.07", "0", "0", "39.07", "-0.93", "610502", "CVS", "MEDDAET", "RXAETD"], ["149618", "2026-03-30 00:00:00", "65702072910", "ACCU-CHEK GUIDE W/DEVICE KIT", "1", "1", "1", "0", "16.94", "0", "4.24", "21.18", "0", "610014", "ESI", "MEDDPRIME", "2FFA"], ["147556", "2026-03-16 00:00:00", "50924097110", "ACCU-CHEK SOFTCLIX LANCETS", "100", "100", "1", "0", "11.38", "0", "0", "11.38", "0", "004336", "CVS", "ADV", "RX1103"], ["147944", "2026-03-18 00:00:00", "50924097110", "ACCU-CHEK SOFTCLIX LANCETS", "100", "100", "1", "0", "11.38", "0", "0", "11.38", "0", "004336", "CVS", "ADV", "RX1103"], ["139434", "2026-03-13 00:00:00", "50924097110", "ACCU-CHEK SOFTCLIX LANCETS", "100", "100", "1", "0", "11.61", "0", "0", "11.61", "0", "004336", "CVS", "ADV", "RX7682"], ["144127", "2026-03-19 00:00:00", "45802073230", "ACETAMINOPHEN 120 MG RECTAL SUPPOSITORY", "12", "12", "1", "0", "12.39", "0", "0", "12.39", "0", "004740", "NYM", "9314DA31", ""], ["146377", "2026-03-07 00:00:00", "69367032304", "ACETAMINOPHEN 160 MG/5ML LIQUID ***** NYM", "118", "118", "1", "0", "11.35", "0", "0", "11.35", "0", "004740", "NYM", "9314DA31", ""], ["146535", "2026-03-09 00:00:00", "57237030412", "ACETAMINOPHEN 160 MG/5ML ORAL SOLUTION", "118", "256", "2.17", "0", "12.72", "0", "0", "12.72", "0", "004740", "NYM", "9314DA31", ""], ["145382", "2026-03-02 00:00:00", "00536132701", "ACETAMINOPHEN 325 MG TABLET * TYLENOL REGULAR", "100", "60", "0.6", "0", "10.97", "0", "0", "10.97", "0", "004740", "NYM", "9314DA31", ""], ["145436", "2026-03-02 00:00:00", "00536132701", "ACETAMINOPHEN 325 MG TABLET * TYLENOL REGULAR", "100", "30", "0.3", "0", "10.58", "0", "0", "10.58", "0", "004740", "NYM", "9314DA31", ""], ["148399", "2026-03-20 00:00:00", "00536132701", "ACETAMINOPHEN 325 MG TABLET * TYLENOL REGULAR", "100", "30", "0.3", "0", "10.58", "0", "0", "10.58", "0", "004740", "NYM", "9314DA31", ""], ["145875", "2026-03-04 00:00:00", "00536132701", "ACETAMINOPHEN 325 MG TABLET * TYLENOL REGULAR", "100", "100", "1", "0", "11.5", "0", "0", "11.5", "0", "004740", "NYM", "9314DA31", ""], ["149344", "2026-03-27 00:00:00", "00536132701", "ACETAMINOPHEN 325 MG TABLET * TYLENOL REGULAR", "100", "60", "0.6", "0", "10.97", "0", "0", "10.97", "0", "004740", "NYM", "9314DA31", ""], ["145421", "2026-03-02 00:00:00", "00536132710", "ACETAMINOPHEN 325MG TABLET", "1000", "120", "0.12", "0", "11.77", "0", "0", "11.77", "0", "004740", "NYM", "9314DA31", ""], ["145845", "2026-03-04 00:00:00", "00536132710", "ACETAMINOPHEN 325MG TABLET", "1000", "90", "0.09", "0", "11.37", "0", "0", "11.37", "0", "004740", "NYM", "9314DA31", ""], ["146005", "2026-03-05 00:00:00", "00536132710", "ACETAMINOPHEN 325MG TABLET", "1000", "90", "0.09", "0", "11.37", "0", "0", "11.37", "0", "004740", "NYM", "9314DA31", ""], ["147126", "2026-03-12 00:00:00", "00536132710", "ACETAMINOPHEN 325MG TABLET", "1000", "100", "0.1", "0", "11.5", "0", "0", "11.5", "0", "004740", "NYM", "9314DA31", ""], ["148964", "2026-03-25 00:00:00", "00536132710", "ACETAMINOPHEN 325MG TABLET", "1000", "30", "0.03", "0", "0", "0", "0.36", "0.36", "0", "610014", "ESI", "PEU", "1181BE"], ["147869", "2026-03-17 00:00:00", "00536132710", "ACETAMINOPHEN 325MG TABLET", "1000", "30", "0.03", "0", "10.58", "0", "0", "10.58", "0", "004740", "NYM", "9314DA31", ""], ["147919", "2026-03-18 00:00:00", "00536132710", "ACETAMINOPHEN 325MG TABLET", "1000", "60", "0.06", "0", "10.97", "0", "0", "10.97", "0", "004740", "NYM", "9314DA31", ""], ["146974", "2026-03-11 00:00:00", "00536132710", "ACETAMINOPHEN 325MG TABLET", "1000", "50", "0.05", "0", "10.84", "0", "0", "10.84", "0", "004740", "NYM", "9314DA31", ""], ["148982", "2026-03-25 00:00:00", "00536132710", "ACETAMINOPHEN 325MG TABLET", "1000", "30", "0.03", "0", "10.58", "0", "0", "10.58", "0", "004740", "NYM", "9314DA31", ""], ["142336", "2026-03-09 00:00:00", "00536132710", "ACETAMINOPHEN 325MG TABLET", "1000", "120", "0.12", "0", "0.96", "0", "0", "0.96", "0", "004336", "CVS", "ADV", "RX1104"], ["137945", "2026-03-04 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "90", "0.09", "0", "11.07", "0", "0", "11.07", "0", "004740", "NYM", "9314DA31", ""], ["146246", "2026-03-06 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "24", "0.02", "0", "0", "0", "3.42", "3.42", "0", "000000", "", "", ""], ["148169", "2026-03-19 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "90", "0.09", "0", "11.07", "0", "0", "11.07", "0", "004740", "NYM", "9314DA31", ""], ["147924", "2026-03-18 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "120", "0.12", "0", "11.37", "0", "0", "11.37", "0", "004740", "NYM", "9314DA31", ""], ["146289", "2026-03-06 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "21", "0.02", "0", "10.39", "0", "0", "10.39", "0", "004740", "NYM", "9314DA31", ""], ["142451", "2026-03-04 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "30", "0.03", "0", "10.48", "0", "0", "10.48", "0", "004740", "NYM", "9314DA31", ""], ["146412", "2026-03-09 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "180", "0.18", "0", "11.96", "0", "0", "11.96", "0", "004740", "NYM", "9314DA31", ""], ["148782", "2026-03-24 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "90", "0.09", "0", "11.07", "0", "0", "11.07", "0", "004740", "NYM", "9314DA31", ""], ["148581", "2026-03-23 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "180", "0.18", "0", "11.96", "0", "0", "11.96", "0", "004740", "NYM", "9314DA31", ""], ["145928", "2026-03-04 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "120", "0.12", "0", "11.37", "0", "0", "11.37", "0", "004740", "NYM", "9314DA31", ""], ["143798", "2026-03-18 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "180", "0.18", "0", "11.96", "0", "0", "11.96", "0", "004740", "NYM", "9314DA31", ""], ["147341", "2026-03-13 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "120", "0.12", "0", "11.37", "0", "0", "11.37", "0", "004740", "NYM", "9314DA31", ""], ["139101", "2026-03-11 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "100", "0.1", "0", "11.17", "0", "0", "11.17", "0", "004740", "NYM", "9314DA31", ""], ["143264", "2026-03-19 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "100", "0.1", "0", "11.17", "0", "0", "11.17", "0", "004740", "NYM", "9314DA31", ""], ["148072", "2026-03-18 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "120", "0.12", "0", "11.37", "0", "0", "11.37", "0", "004740", "NYM", "9314DA31", ""], ["148753", "2026-03-24 00:00:00", "00904672080", "ACETAMINOPHEN 500MG TABLET NYM", "1000", "60", "0.06", "0", "0.78", "0", "0", "0.78", "0", "004336", "CVS", "ADV", "RX1104"], ["147605", "2026-03-16 00:00:00", "00904701420", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SOLUTION", "118", "118", "1", "0", "11.35", "0", "0", "11.35", "0", "004740", "NYM", "9314DA31", ""], ["146305", "2026-03-06 00:00:00", "00904701420", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SOLUTION", "118", "118", "1", "0", "11.35", "0", "0", "11.35", "0", "004740", "NYM", "9314DA31", ""], ["147831", "2026-03-17 00:00:00", "00904701420", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SOLUTION", "118", "236", "2", "0", "12.53", "0", "0", "12.53", "0", "004740", "NYM", "9314DA31", ""], ["132280", "2026-03-12 00:00:00", "00904701420", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SOLUTION", "118", "118", "1", "0", "11.35", "0", "0", "11.35", "0", "004740", "NYM", "9314DA31", ""], ["148663", "2026-03-23 00:00:00", "00904701420", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SOLUTION", "118", "118", "1", "0", "11.35", "0", "0", "11.35", "0", "004740", "NYM", "9314DA31", ""], ["142081", "2026-03-05 00:00:00", "00904701420", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SOLUTION", "118", "354", "3", "0", "13.7", "0", "0", "13.7", "0", "004740", "NYM", "9314DA31", ""], ["128569", "2026-03-16 00:00:00", "00904701420", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SOLUTION", "118", "118", "1", "0", "11.35", "0", "0", "11.35", "0", "004740", "NYM", "9314DA31", ""], ["148457", "2026-03-20 00:00:00", "00904701420", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SOLUTION", "118", "236", "2", "0", "12.53", "0", "0", "12.53", "0", "004740", "NYM", "9314DA31", ""], ["147213", "2026-03-12 00:00:00", "00904701420", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SOLUTION", "118", "118", "1", "0", "11.35", "0", "0", "11.35", "0", "004740", "NYM", "9314DA31", ""], ["148371", "2026-03-20 00:00:00", "00904701420", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SOLUTION", "118", "472", "4", "0", "14.87", "0", "0", "14.87", "0", "004740", "NYM", "9314DA31", ""], ["145899", "2026-03-04 00:00:00", "45802020126", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SUSPENSION", "118", "118", "1", "3", "11.33", "0", "0", "11.33", "8.33", "004740", "NYM", "9314DA31", ""], ["145899", "2026-03-20 00:00:00", "45802020126", "ACETAMINOPHEN CHILDRENS 160 MG/5ML ORAL SUSPENSION", "118", "118", "1", "3", "11.33", "0", "0", "11.33", "8.33", "004740", "NYM", "9314DA31", ""], ["148592", "2026-03-23 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "30", "0.07", "2.48", "11.54", "0", "0", "11.54", "9.06", "004740", "NYM", "9314DA31", ""], ["146692", "2026-03-10 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "90", "0.23", "7.43", "14.27", "0", "0", "14.27", "6.84", "004740", "NYM", "9314DA31", ""], ["141223", "2026-03-26 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "180", "0.45", "14.85", "18.36", "0", "0", "18.36", "3.51", "004740", "NYM", "9314DA31", ""], ["146812", "2026-03-10 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "100", "0.25", "8.25", "14.72", "0", "0", "14.72", "6.47", "004740", "NYM", "9314DA31", ""], ["140888", "2026-03-25 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "100", "0.25", "8.25", "14.72", "0", "0", "14.72", "6.47", "004740", "NYM", "9314DA31", ""], ["146855", "2026-03-10 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "30", "0.07", "2.48", "11.54", "0", "0", "11.54", "9.06", "004740", "NYM", "9314DA31", ""], ["149240", "2026-03-26 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "90", "0.23", "7.43", "14.27", "0", "0", "14.27", "6.84", "004740", "NYM", "9314DA31", ""], ["146918", "2026-03-11 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "180", "0.45", "14.85", "18.36", "0", "0", "18.36", "3.51", "004740", "NYM", "9314DA31", ""], ["144650", "2026-03-24 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "180", "0.45", "14.85", "9.32", "0", "0", "9.32", "-5.53", "004336", "CVS", "ADV", "RX1104"], ["146888", "2026-03-11 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "100", "0.25", "8.25", "14.72", "0", "0", "14.72", "6.47", "004740", "NYM", "9314DA31", ""], ["142001", "2026-03-05 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "30", "0.07", "2.48", "11.54", "0", "0", "11.54", "9.06", "004740", "NYM", "9314DA31", ""], ["147868", "2026-03-17 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "100", "0.25", "8.25", "14.72", "0", "0", "14.72", "6.47", "004740", "NYM", "9314DA31", ""], ["149531", "2026-03-30 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "180", "0.45", "14.85", "18.36", "0", "0", "18.36", "3.51", "004740", "NYM", "9314DA31", ""], ["147773", "2026-03-17 00:00:00", "00904731427", "ACETAMINOPHEN ER 650MG TABLET ER", "400", "100", "0.25", "8.25", "14.72", "0", "0", "14.72", "6.47", "004740", "NYM", "9314DA31", ""], ["146562", "2026-03-09 00:00:00", "00904673080", "ACETAMINOPHEN EXTRA STRENGTH 500 MG ORAL TABLET", "1000", "30", "0.03", "0.51", "10.48", "0", "0", "10.48", "9.97", "004740", "NYM", "9314DA31", ""], ["143420", "2026-03-16 00:00:00", "00904673080", "ACETAMINOPHEN EXTRA STRENGTH 500 MG ORAL TABLET", "1000", "90", "0.09", "1.53", "11.07", "0", "0", "11.07", "9.54", "004740", "NYM", "9314DA31", ""], ["129929", "2026-03-26 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "120", "0.24", "1.92", "11.37", "0", "0", "11.37", "9.45", "004740", "NYM", "9314DA31", ""], ["146015", "2026-03-05 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "180", "0.36", "2.88", "11.96", "0", "0", "11.96", "9.08", "004740", "NYM", "9314DA31", ""], ["146649", "2026-03-10 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "156", "0.31", "2.5", "11.72", "0", "0", "11.72", "9.22", "004740", "NYM", "9314DA31", ""], ["148488", "2026-03-21 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "180", "0.36", "2.88", "11.96", "0", "0", "11.96", "9.08", "004740", "NYM", "9314DA31", ""], ["143614", "2026-03-12 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "90", "0.18", "1.44", "11.07", "0", "0", "11.07", "9.63", "004740", "NYM", "9314DA31", ""], ["147078", "2026-03-12 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "240", "0.48", "3.84", "12.56", "0", "0", "12.56", "8.72", "004740", "NYM", "9314DA31", ""], ["145995", "2026-03-05 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "240", "0.48", "3.84", "12.56", "0", "0", "12.56", "8.72", "004740", "NYM", "9314DA31", ""], ["128875", "2026-03-13 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "60", "0.12", "0.96", "10.77", "0", "0", "10.77", "9.81", "004740", "NYM", "9314DA31", ""], ["148226", "2026-03-19 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "60", "0.12", "0.96", "10.77", "0", "0", "10.77", "9.81", "004740", "NYM", "9314DA31", ""], ["147616", "2026-03-16 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "21", "0.04", "0.34", "10.39", "0", "0", "10.39", "10.05", "004740", "NYM", "9314DA31", ""], ["142310", "2026-03-09 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "180", "0.36", "2.88", "11.96", "0", "0", "11.96", "9.08", "004740", "NYM", "9314DA31", ""], ["138832", "2026-03-11 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "90", "0.18", "1.44", "11.07", "0", "0", "11.07", "9.63", "004740", "NYM", "9314DA31", ""], ["142385", "2026-03-02 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "90", "0.18", "1.44", "11.07", "0", "0", "11.07", "9.63", "004740", "NYM", "9314DA31", ""], ["149723", "2026-03-31 00:00:00", "00904672040", "ACETAMINOPHEN EXTRA STRENGTH 500MG TABLET **** NYM", "500", "90", "0.18", "1.44", "11.07", "0", "0", "11.07", "9.63", "004740", "NYM", "9314DA31", ""], ["149389", "2026-03-27 00:00:00", "65162003310", "ACETAMINOPHEN-CODEINE #3 300-30 MG TABLET", "100", "7", "0.07", "2.31", "0", "0", "3.1", "3.1", "0.79", "610014", "ESI", "", "SSEU371"], ["147577", "2026-03-16 00:00:00", "50242014301", "ACTEMRA ACTPEN 162 MG/0.9ML SUBCUTANEOUS SOLUTION AUTO-INJECTOR", "0.9", "1.8", "2", "0", "2312.48", "0", "0", "2312.48", "0", "004740", "NYM", "9314DA31", ""], ["148635", "2026-03-23 00:00:00", "31722077705", "ACYCLOVIR 400 MG TABLET", "500", "60", "0.12", "0", "15.65", "0", "0", "15.65", "0", "004740", "NYM", "9314DA31", ""], ["146611", "2026-03-09 00:00:00", "68462074635", "ACYCLOVIR 5 % EXTERNAL OINTMENT", "30", "30", "1", "16", "24.15", "0", "6", "30.15", "14.15", "003858", "ESI", "A4", "2GKA"], ["144611", "2026-03-24 00:00:00", "68462074635", "ACYCLOVIR 5 % EXTERNAL OINTMENT", "30", "30", "1", "16", "5.73", "0", "0", "5.73", "-10.27", "004336", "CVS", "ADV", "RX0839"], ["147500", "2026-03-14 00:00:00", "00173069600", "ADVAIR DISKUS 250-50MCG/DOSE AEROSOL 60EA", "60", "60", "1", "0", "182.54", "0", "0", "182.54", "0", "004336", "CVS", "MEDDADV", "RX8585"], ["143441", "2026-03-16 00:00:00", "00173071720", "ADVAIR HFA 230-21 MCG/ACT INHALATION AEROSOL", "12", "12", "1", "0", "430.76", "0", "0", "430.76", "0", "004740", "NYM", "9314DA31", ""], ["149349", "2026-03-27 00:00:00", "00173071520", "ADVAIR HFA 45-21 MCG/ACT INHALATION AEROSOL 12GM", "12", "12", "1", "241", "236.82", "0", "1.6", "238.42", "-2.58", "004336", "CVS", "MEDDADV", "RX1110"], ["143556", "2026-03-16 00:00:00", "00310908012", "AIRSUPRA 90-80 MCG/ACT INHALATION AEROSOL", "10.7", "10.7", "1", "485", "493.53", "0", "0", "493.53", "8.53", "004740", "NYM", "9314DA31", ""], ["145705", "2026-03-31 00:00:00", "00310908012", "AIRSUPRA 90-80 MCG/ACT INHALATION AEROSOL", "10.7", "10.7", "1", "485", "440.78", "0", "4.9", "445.68", "-39.32", "610014", "ESI", "MEDDPRIME", "2FFA"], ["147295", "2026-03-13 00:00:00", "00310908012", "AIRSUPRA 90-80 MCG/ACT INHALATION AEROSOL", "10.7", "10.7", "1", "485", "479.3", "0", "0", "479.3", "-5.7", "004336", "CVS", "MEDDADV", "RX1110"], ["145705", "2026-03-03 00:00:00", "00310908012", "AIRSUPRA 90-80 MCG/ACT INHALATION AEROSOL", "10.7", "10.7", "1", "485", "440.78", "0", "4.9", "445.68", "-39.32", "610014", "ESI", "MEDDPRIME", "2FFA"], ["149615", "2026-03-30 00:00:00", "00310908012", "AIRSUPRA 90-80 MCG/ACT INHALATION AEROSOL", "10.7", "10.7", "1", "485", "479.3", "0", "0", "479.3", "-5.7", "004336", "CVS", "MEDDADV", "RX1110"]]}};
+    const JOB_ID = '2292753a937e4fff8588d03de9d4ea3e';
+    </script>
+
+    <div class="panel" id="panel-donotorder">
+      <div class="panel-header">
+        <div class="panel-title">
+          Drugs overstocked — do not order
+          <span class="panel-badge" style="background:#EAF3DE;color:#3B6D11">
+            198 drugs
+          </span>
+        </div>
+        <div class="panel-actions">
+          <input class="search-input" id="search-donotorder" placeholder="Search drug name..." oninput="filterDNO()">
+          <button class="export-btn" style="background:#639922" onclick="exportDNO()">Export list</button>
+          <button class="btn-ghost" onclick="togglePanel(&#39;donotorder&#39;)">Close</button>
+        </div>
+      </div>
+      <div class="scroll-body">
+        <table class="panel-table" id="table-donotorder">
+          <thead id="thead-donotorder"></thead>
+          <tbody id="tbody-donotorder"></tbody>
+        </table>
+      </div>
+      <div class="panel-footer">
+        <div>Showing <span id="showing-dno">0</span> of <span id="total-dno">0</span> drugs</div>
+        <div>
+          <button class="btn-primary-sm" id="loadmore-dno" onclick="loadMoreDNO()" style="display:none;background:#639922">Load more</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DISCREPANCIES + REVENUE ROW ── -->
+    <div class="row g-3 mb-3">
+
+      <!-- Left: Top discrepancies table -->
+      <div class="col-12 col-lg-6">
+        <div class="pt-card h-100">
+          <div class="section-heading">Top discrepancies by drug</div>
+          <table class="disc-table">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Drug name</th>
+                <th style="text-align:center;">Billed</th>
+                <th style="text-align:center;">Purchased</th>
+                <th style="text-align:right;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              
+              <tr>
+                <td style="font-size:0.82rem">REFRESH OPTIVE 0.5-0.9% SOLUTION</td>
+                <td style="text-align:center">61.0 pkg</td>
+                <td style="text-align:center">3.0 pkg</td>
+                <td style="text-align:right">
+                  
+                  <span class="status-pill pill-red">-58.0 pkg</span>
+                  
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="font-size:0.82rem">DICLOFENAC SODIUM 1 % EXT GEL **NYM**</td>
+                <td style="text-align:center">90.0 pkg</td>
+                <td style="text-align:center">48.0 pkg</td>
+                <td style="text-align:right">
+                  
+                  <span class="status-pill pill-red">-42.0 pkg</span>
+                  
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="font-size:0.82rem">ALBUTEROL SULFATE HFA 108 (90 BASE)MCG/A</td>
+                <td style="text-align:center">78.0 pkg</td>
+                <td style="text-align:center">36.0 pkg</td>
+                <td style="text-align:right">
+                  
+                  <span class="status-pill pill-red">-42.0 pkg</span>
+                  
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="font-size:0.82rem">AZELASTINE HCL 137MCG/SPRAY SOLUTION</td>
+                <td style="text-align:center">1.0 pkg</td>
+                <td style="text-align:center">12.0 pkg</td>
+                <td style="text-align:right">
+                  
+                  <span class="status-pill pill-green">+11.0 pkg</span>
+                  
+                </td>
+              </tr>
+              
+              <tr>
+                <td style="font-size:0.82rem">ROBAFEN DM 20-200 MG/20ML ORAL LIQUID</td>
+                <td style="text-align:center">3.0 pkg</td>
+                <td style="text-align:center">15.0 pkg</td>
+                <td style="text-align:right">
+                  
+                  <span class="status-pill pill-green">+12.0 pkg</span>
+                  
+                </td>
+              </tr>
+              
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Right: Revenue by processor -->
+      <div class="col-12 col-lg-6">
+        <div class="pt-card h-100">
+          <div class="section-heading">Revenue by processor</div>
+
+          
+          
+            
+          
+            
+          
+            
+          
+            
+          
+            
+          
+            
+          
+            
+          
+            
+          
+            
+          
+            
+          
+            
+          
+            
+          
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              CVS
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:61.8%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">61.8%</span>
+            <span class="proc-val">$336,103</span>
+          </div>
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              NYM
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:23.2%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">23.2%</span>
+            <span class="proc-val">$126,439</span>
+          </div>
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              ESI
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:6.9%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">6.9%</span>
+            <span class="proc-val">$37,796</span>
+          </div>
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              MEDIMP
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:3.4%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">3.4%</span>
+            <span class="proc-val">$18,512</span>
+          </div>
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              OPTUM
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:3.3%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">3.3%</span>
+            <span class="proc-val">$18,111</span>
+          </div>
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              ADAP
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:0.8%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">0.8%</span>
+            <span class="proc-val">$4,203</span>
+          </div>
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              ARG/HUM
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:0.3%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">0.3%</span>
+            <span class="proc-val">$1,642</span>
+          </div>
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              PRIMECAPRX
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:0.2%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">0.2%</span>
+            <span class="proc-val">$1,343</span>
+          </div>
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              ENVISIONRX
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:0.0%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">0.0%</span>
+            <span class="proc-val">$120</span>
+          </div>
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              TREDIUM
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:0.0%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">0.0%</span>
+            <span class="proc-val">$11</span>
+          </div>
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              NAVITUS
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:0.0%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">0.0%</span>
+            <span class="proc-val">$3</span>
+          </div>
+          
+          
+          <div class="proc-row">
+            <span class="proc-name">
+              PRIME THER
+              
+            </span>
+            <div class="proc-bar-wrap">
+              <div class="proc-bar" style="width:0.0%;background:#185FA5;">
+              </div>
+            </div>
+            <span class="proc-pct">0.0%</span>
+            <span class="proc-val">$0</span>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DOCTORS + INSIGHTS ROW ── -->
+    <div class="row g-3">
+
+      <!-- Left: Top referring doctors -->
+      <div class="col-12 col-lg-6">
+        <div class="card" id="doctor-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:0.5px solid var(--color-border-tertiary)">
+            <span class="card-title">Top referring doctors</span>
+            <button id="docExpandBtn" onclick="toggleDoctorList()" style="font-size:12px;color:#185FA5;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px">
+              ▾ Show all 20 doctors
+            </button>
+          </div>
+
+          
+
+          
+          
+          <div class="doc-row" id="doc-row-0" style="border-bottom:0.5px solid var(--color-border-tertiary)">
+
+            <div onclick="toggleDoc(0)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">1</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                DF
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Delacruz Fernandez Jose
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-234-0800 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:100.0%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">216 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">5.2% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">216 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-0" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-0" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-234-0800<br>
+                    📠 212-234-2223
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    19 HAMILTON PL 1ST FLOOR<br>
+                    NEW YORK, NY 10031
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1023516622</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>216 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>216 Rx (5.2%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-1" style="border-bottom:0.5px solid var(--color-border-tertiary)">
+
+            <div onclick="toggleDoc(1)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">2</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                CM
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Cabrera Michelle
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-283-2099 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:74.5%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">161 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">3.9% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">161 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-1" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-1" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-283-2099<br>
+                    📠 800-604-6146
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    3410-18 BROADWAY 2ND FL<br>
+                    NEW YORK, NY 10031
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1619226305</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>161 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>161 Rx (3.9%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-2" style="border-bottom:0.5px solid var(--color-border-tertiary)">
+
+            <div onclick="toggleDoc(2)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">3</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                HJ
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Haque Jr Muhammad M
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-283-2099 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:54.2%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">117 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">2.8% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">117 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-2" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-2" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-283-2099<br>
+                    📠 800-604-6146
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    3410-18 BROADWAY 2ND FL<br>
+                    NEW YORK, NY 10031
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1225103583</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>117 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>117 Rx (2.8%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-3" style="border-bottom:0.5px solid var(--color-border-tertiary)">
+
+            <div onclick="toggleDoc(3)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">4</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                AJ
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Arcentales Jonathan
+                  
+                  <span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:10px;margin-left:4px">2 locations</span>
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-470-1000 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:44.9%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">97 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">2.3% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">97 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-3" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-3" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-470-1000<br>
+                    📠 800-604-6146
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    565 WEST 125 STREET<br>
+                    NEW YORK, NY 10027-3425
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1598303786</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>97 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>97 Rx (2.3%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-4" style="border-bottom:0.5px solid var(--color-border-tertiary)">
+
+            <div onclick="toggleDoc(4)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">5</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                CM
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Correa Michael
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-665-8012 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:40.7%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">88 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">2.1% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">88 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-4" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-4" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-665-8012<br>
+                    📠 212-222-8905
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    1302 AMSTERDAM AVE<br>
+                    NEW YORK, NY 10027-4281
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1083765531</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>88 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>88 Rx (2.1%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-5" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(5)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">6</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                SU
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Sibirceva Una
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">718-676-0560 · BROOKLYN, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:29.2%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">63 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">1.5% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">63 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-5" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-5" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 718-676-0560<br>
+                    📠 718-676-0561
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    719 OCEAN VIEW AVE<br>
+                    BROOKLYN, NY 11235
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1174777379</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>63 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>63 Rx (1.5%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-6" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(6)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">7</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                SZ
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Stegman Zeev
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-569-2020 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:22.7%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">49 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">1.2% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">49 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-6" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-6" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-569-2020<br>
+                    📠 212-409-8242
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    101 SHERMAN AVE<br>
+                    NEW YORK, NY 10034-5626
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1124001151</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>49 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>49 Rx (1.2%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-7" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(7)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">8</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                RA
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Roberts Arielle
+                  
+                  <span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:10px;margin-left:4px">3 locations</span>
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-368-2020 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:19.0%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">41 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">1.0% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">41 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-7" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-7" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-368-2020<br>
+                    📠 212-368-2029
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    454 LENOX AVENUE<br>
+                    NEW YORK, NY 10037
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1376085761</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>41 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>41 Rx (1.0%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-8" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(8)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">9</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                JJ
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Jimenezarias Jhonsua
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-548-6557 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:18.5%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">40 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">1.0% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">40 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-8" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-8" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-548-6557<br>
+                    📠 212-918-8171
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    1786 AMSTERDAM AVE<br>
+                    NEW YORK, NY 10031-3546
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1952700171</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>40 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>40 Rx (1.0%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-9" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(9)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">10</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                PA
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Prigollini Alejandro
+                  
+                  <span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:10px;margin-left:4px">2 locations</span>
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-523-8672 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:17.6%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">38 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">0.9% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">38 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-9" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-9" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-523-8672<br>
+                    📠 212-531-7640
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    638 COLUMBUS AVE<br>
+                    NEW YORK, NY 10024
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1558354308</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>38 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>38 Rx (0.9%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-10" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(10)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">11</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                RJ
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Ramnarine Jotir
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-491-2400 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:16.2%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">35 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">0.8% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">35 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-10" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-10" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-491-2400<br>
+                    📠 646-680-2588
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    215 WEST 125TH STREET<br>
+                    NEW YORK, NY 10027
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1275571762</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>35 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>35 Rx (0.8%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-11" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(11)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">12</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                GF
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Gonzalez Fausto
+                  
+                  <span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:10px;margin-left:4px">2 locations</span>
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">718-299-2100 · BRONX, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:14.8%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">32 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">0.8% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">32 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-11" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-11" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 718-299-2100<br>
+                    📠 718-299-2102
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    1 EAST TREMONT AVE<br>
+                    BRONX, NY 10453
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1124087713</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>32 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>32 Rx (0.8%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-12" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(12)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">13</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                BH
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Batista Herasme Natividad
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-234-0800 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:14.4%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">31 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">0.8% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">31 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-12" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-12" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-234-0800<br>
+                    📠 212-234-2223
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    19 HAMILTON PL 1ST FLOOR<br>
+                    NEW YORK, NY 10031-6885
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1326815424</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>31 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>31 Rx (0.8%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-13" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(13)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">14</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                RF
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Rosario Francisco
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-234-0800 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:13.4%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">29 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">0.7% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">29 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-13" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-13" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-234-0800<br>
+                    📠 212-234-2223
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    19 HAMILTON PL 1ST FLOOR<br>
+                    NEW YORK, NY 10031
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1902835192</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>29 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>29 Rx (0.7%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-14" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(14)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">15</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                GJ
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Germosen Joely
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">347-248-6538 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:13.4%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">29 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">0.7% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">29 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-14" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-14" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 347-248-6538<br>
+                    📠 646-297-9801
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    161 FORT WASHINGTON AVENUE<br>
+                    NEW YORK, NY 10032
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1285158485</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>29 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>29 Rx (0.7%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-15" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(15)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">16</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                BC
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Balmaceda Casilda
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-305-4572 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:13.0%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">28 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">0.7% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">28 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-15" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-15" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-305-4572<br>
+                    📠 404-494-7406
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    710 W 168TH ST<br>
+                    NEW YORK, NY 10032-3726
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1093751919</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>28 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>28 Rx (0.7%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-16" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(16)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">17</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                RA
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Reddy Arthi
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-305-2001 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:12.5%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">27 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">0.7% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">27 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-16" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-16" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-305-2001<br>
+                    📠 212-305-0713
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    COLUMBIADOCTORS MORNINGSIDE<br>
+                    NEW YORK, NY 10025
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1760663363</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>27 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>27 Rx (0.7%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-17" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(17)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">18</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                WK
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Williams Kerah
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-862-0054 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:12.5%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">27 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">0.7% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">27 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-17" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-17" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-862-0054<br>
+                    📠 212-862-5516
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    1727 AMSTERDAM AVENUE<br>
+                    NEW YORK, NY 10031
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1801022751</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>27 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>27 Rx (0.7%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-18" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(18)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">19</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                KN
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Kratz Nathaniel
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-491-2300 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:12.0%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">26 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">0.6% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">26 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-18" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-18" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-491-2300<br>
+                    📠 212-491-2323
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    534 W. 135TH ST.<br>
+                    NEW YORK, NY 10031
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1639532476</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>26 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>26 Rx (0.6%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          
+          <div class="doc-row" id="doc-row-19" style="display:none;border-bottom:0.5px solid var(--color-border-tertiary)" data-extra="true">
+
+            <div onclick="toggleDoc(19)" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background=&#39;var(--color-background-secondary)&#39;" onmouseout="this.style.background=&#39;transparent&#39;">
+              <span style="font-size:12px;color:var(--color-text-secondary);width:18px;text-align:center">20</span>
+              <div style="width:34px;height:34px;border-radius:50%;background:var(--color-background-info);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--color-text-info);flex-shrink:0">
+                AM
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">
+                  Abeyewardene Menaka
+                  
+                  <span style="font-size:10px;background:#FAEEDA;color:#854F0B;padding:1px 6px;border-radius:10px;margin-left:4px">2 locations</span>
+                  
+                </div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:2px">212-283-2099 · NEW YORK, NY</div>
+                <div style="width:100%;height:4px;background:var(--color-background-secondary);border-radius:2px;overflow:hidden;margin-top:5px">
+                  <div style="width:11.1%;height:100%;border-radius:2px;background:#185FA5"></div>
+                </div>
+              </div>
+              <div style="text-align:right;margin-left:12px;flex-shrink:0">
+                <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">24 Rx</div>
+                <div style="font-size:11px;color:var(--color-text-secondary)">0.6% of business</div>
+                <div style="font-size:10px;margin-top:2px">
+                  <span style="background:#E6F1FB;color:#0C447C;padding:1px 5px;border-radius:10px">24 ins</span>
+                  <span style="background:#EAF3DE;color:#3B6D11;padding:1px 5px;border-radius:10px">0 cash</span>
+                </div>
+              </div>
+              <span id="arrow-19" style="font-size:14px;color:var(--color-text-secondary);margin-left:8px;transition:transform 0.2s;flex-shrink:0">▾</span>
+            </div>
+
+            <div id="detail-19" style="max-height:0;overflow:hidden;transition:max-height 0.3s,opacity 0.2s;opacity:0">
+              <div style="padding:0 20px 16px 64px;display:grid;grid-template-columns:1fr 1fr;gap:16px;background:var(--color-background-secondary)">
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Contact</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    📞 212-283-2099<br>
+                    📠 800-604-6146
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Address</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    3410-18 BROADWAY 2ND FL<br>
+                    NEW YORK, NY 10031-7419
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">NPI Number</div>
+                  <div style="font-size:12px;font-family:monospace;color:var(--color-text-secondary)">1336604008</div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;color:var(--color-text-secondary);margin-bottom:6px">Rx breakdown</div>
+                  <div style="font-size:12px;color:var(--color-text-primary);line-height:1.8">
+                    Insurance: <strong>24 Rx</strong><br>
+                    Cash: <strong>0 Rx</strong><br>
+                    Total: <strong>24 Rx (0.6%)</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+
+          <div style="display:flex;justify-content:space-between;padding:10px 20px;background:var(--color-background-secondary);font-size:12px;color:var(--color-text-secondary);border-top:0.5px solid var(--color-border-tertiary)">
+            <span>Showing top <span id="showingCount">5</span> of 20 doctors</span>
+            <span>
+              
+              
+              Top 5: 679 Rx
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Key insights -->
+      <div class="col-12 col-lg-6">
+        <div class="pt-card h-100">
+          <div class="section-heading">Key insights</div>
+
+          
+          <div class="insight-row">
+            <span class="insight-dot
+              dot-red
+              "></span>
+            <div>
+              <div class="insight-title">CVS pays 61.8% of all revenue</div>
+              <div class="insight-sub">High dependency — risk if this payer changes rates</div>
+            </div>
+          </div>
+          
+          <div class="insight-row">
+            <span class="insight-dot
+              dot-red
+              "></span>
+            <div>
+              <div class="insight-title">7 branded drugs purchased but not billed</div>
+              <div class="insight-sub">$6,786 needs investigation (excl. vaccines)</div>
+            </div>
+          </div>
+          
+          <div class="insight-row">
+            <span class="insight-dot
+              dot-amber
+              "></span>
+            <div>
+              <div class="insight-title">680 drugs need to be ordered</div>
+              <div class="insight-sub">View order list for estimated restock cost</div>
+            </div>
+          </div>
+          
+          <div class="insight-row">
+            <span class="insight-dot
+              dot-amber
+              "></span>
+            <div>
+              <div class="insight-title">4131 Rx comparisons analyzed</div>
+              <div class="insight-sub">Check Rx comparison sheet for underpayments eligible for dispute</div>
+            </div>
+          </div>
+          
+          <div class="insight-row">
+            <span class="insight-dot
+              dot-amber
+              "></span>
+            <div>
+              <div class="insight-title">548 drugs billed but never purchased</div>
+              <div class="insight-sub">Possible data entry errors — investigate</div>
+            </div>
+          </div>
+          
+          <div class="insight-row">
+            <span class="insight-dot
+              dot-green
+              "></span>
+            <div>
+              <div class="insight-title">198 drugs are overstocked</div>
+              <div class="insight-sub">Do not order these — cash tied up in inventory</div>
+            </div>
+          </div>
+          
+          <div class="insight-row">
+            <span class="insight-dot
+              dot-green
+              "></span>
+            <div>
+              <div class="insight-title">4,130 total Rx processed this period</div>
+              <div class="insight-sub">Avg insurance paid: $132.08 per Rx</div>
+            </div>
+          </div>
+          
+          <div class="insight-row">
+            <span class="insight-dot
+              dot-amber
+              "></span>
+            <div>
+              <div class="insight-title">Top 2 insurances = 85% of revenue</div>
+              <div class="insight-sub">CVS + NYM dominate your revenue</div>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="app-footer">
+    © <span id="year">2026</span> Developed by <strong>Priyanka Gulgari</strong>
+  </footer>
+
+  <script src="./PharmaTrack — Dashboard_files/bootstrap.bundle.min.js.download"></script>
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    let allDocsVisible = false;
+
+    function toggleDoctorList() {
+      allDocsVisible = !allDocsVisible;
+      document.querySelectorAll('[data-extra="true"]').forEach(el => {
+        el.style.display = allDocsVisible ? 'block' : 'none';
+      });
+      const btn = document.getElementById('docExpandBtn');
+      const count = document.getElementById('showingCount');
+      if (allDocsVisible) {
+        btn.textContent = '▴ Show less';
+        count.textContent = document.querySelectorAll('.doc-row').length;
+      } else {
+        btn.textContent = '▾ Show all doctors';
+        count.textContent = '5';
+      }
+    }
+
+    function toggleDoc(idx) {
+      const detail = document.getElementById('detail-' + idx);
+      const arrow = document.getElementById('arrow-' + idx);
+      const isOpen = detail.style.maxHeight && detail.style.maxHeight !== '0px' && detail.style.maxHeight !== '';
+      if (isOpen) {
+        detail.style.maxHeight = '0';
+        detail.style.opacity = '0';
+        arrow.style.transform = 'rotate(0deg)';
+      } else {
+        detail.style.maxHeight = '300px';
+        detail.style.opacity = '1';
+        arrow.style.transform = 'rotate(180deg)';
+      }
+    }
+
+    let dnoPage = 1;
+    let dnoAllRows = [];
+    let dnoColumns = [];
+
+    function togglePanel(id) {
+      const panel = document.getElementById('panel-' + id);
+      const isOpen = panel.classList.contains('open');
+      panel.classList.toggle('open', !isOpen);
+      if (!isOpen && id === 'donotorder') {
+        loadDNOData();
+      }
+    }
+
+    function loadDNOData() {
+      const data = EXCEL_DATA['do_not_order'];
+      if (!data || data.count === 0) {
+        document.getElementById('tbody-donotorder').innerHTML =
+          '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--color-text-secondary)">No data found</td></tr>';
+        return;
+      }
+      dnoColumns = data.columns;
+      dnoAllRows = data.rows;
+      document.getElementById('thead-donotorder').innerHTML =
+        '<tr>' + dnoColumns.map(c => `<th>${c}</th>`).join('') + '</tr>';
+      renderDNO(dnoAllRows.slice(0, 50));
+      document.getElementById('showing-dno').textContent = Math.min(50, dnoAllRows.length);
+      document.getElementById('total-dno').textContent = data.count;
+      if (data.count > 50) {
+        document.getElementById('loadmore-dno').style.display = 'block';
+      }
+    }
+
+    function renderDNO(rows) {
+      document.getElementById('tbody-donotorder').innerHTML =
+        rows.map(row => '<tr>' + row.map(cell => `<td>${cell}</td>`).join('') + '</tr>').join('');
+    }
+
+    function filterDNO() {
+      const search = document.getElementById('search-donotorder').value.toLowerCase();
+      const filtered = search
+        ? dnoAllRows.filter(row => row.some(cell => String(cell).toLowerCase().includes(search)))
+        : dnoAllRows;
+      renderDNO(filtered.slice(0, 50));
+      document.getElementById('showing-dno').textContent = Math.min(50, filtered.length);
+      document.getElementById('total-dno').textContent = filtered.length;
+    }
+
+    async function loadMoreDNO() {
+      dnoPage++;
+      try {
+        const res = await fetch(`/api/sheet_data?job_id=${JOB_ID}&sheet=do_not_order&page=${dnoPage}`);
+        const data = await res.json();
+        if (data.ok) {
+          const tbody = document.getElementById('tbody-donotorder');
+          data.rows.forEach(row => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = row.map(cell => `<td>${cell}</td>`).join('');
+            tbody.appendChild(tr);
+          });
+          const showing = document.getElementById('showing-dno');
+          showing.textContent = parseInt(showing.textContent) + data.rows.length;
+          if (!data.has_more) document.getElementById('loadmore-dno').style.display = 'none';
+        }
+      } catch(e) { console.error(e); }
+    }
+
+    let unbilledOpen = false;
+
+    function toggleUnbilled() {
+      unbilledOpen = !unbilledOpen;
+      const panel = document.getElementById('panel-unbilled');
+      const card  = document.getElementById('unbilled-card');
+      panel.classList.toggle('open', unbilledOpen);
+      card.style.boxShadow = unbilledOpen ? '0 0 0 2px #E24B4A' : 'none';
+    }
+
+    function exportUnbilled() {
+      const drugs = [{"cost": 5053.9, "drug": "TRADJENTA TB 5MG 30", "is_vaccine": false, "status": "Investigate"}, {"cost": 2335.67, "drug": "SHINGRIX SY 50MCG 10X0.5ML PF PFS", "is_vaccine": true, "status": "Vaccine \u2014 billed separately"}, {"cost": 765.96, "drug": "ADVAIR DISKUS IN 500-50MCG 60", "is_vaccine": false, "status": "Investigate"}, {"cost": 701.1, "drug": "ROCKLATAN DR0.02-0.005%2.5ML OPTH", "is_vaccine": false, "status": "Investigate"}, {"cost": 121.22, "drug": "INS GLARGINE-YFGN MD 100U/ML 10ML", "is_vaccine": false, "status": "Investigate"}, {"cost": 73.27999999999997, "drug": "VRAYLAR CP 4.5MG 30", "is_vaccine": false, "status": "Investigate"}, {"cost": 70.82, "drug": "HC/ACETIC ACID DR 2-1% 10ML OTIC", "is_vaccine": false, "status": "Investigate"}];
+      const headers = 'Drug Name,Kinray Cost,Status';
+      const rows = drugs.map(d =>
+        `"${d.drug}",${d.cost.toFixed(2)},"${d.status}"`
+      ).join('\n');
+      const csv = headers + '\n' + rows;
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'branded_not_billed.csv';
+      a.click();
+    }
+
+    function exportDNO() {
+      if (!dnoAllRows.length) return;
+      const headers = dnoColumns.join(',');
+      const rows = dnoAllRows.map(r =>
+        r.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')
+      ).join('\n');
+      const csv = headers + '\n' + rows;
+      const blob = new Blob([csv], {type: 'text/csv'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'do_not_order.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    let kinrayOpen = false;
+    function toggleKinray() {
+      kinrayOpen = !kinrayOpen;
+      document.getElementById('kinray-panel')
+        .classList.toggle('open', kinrayOpen);
+      document.getElementById('kinray-card')
+        .classList.toggle('active', kinrayOpen);
+      if (kinrayOpen) {
+        setTimeout(() => {
+          document.querySelectorAll('.breakdown-bar')
+            .forEach(b => b.style.width = b.dataset.w + '%');
+        }, 50);
+      }
+    }
+  </script>
+
+</body></html>
