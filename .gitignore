@@ -1,0 +1,16 @@
+# Sensitive test data & generated output — never commit these
+Test Data _ feb/
+TestData-March/
+processed/
+uploads/
+reports/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
