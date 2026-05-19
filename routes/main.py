@@ -39,7 +39,7 @@ def index():
     past_reports = []
     reports_dir = os.path.join(current_app.root_path, 'reports')
     if os.path.isdir(reports_dir):
-        for fpath in sorted(glob(os.path.join(reports_dir, '*_report.json')), reverse=True):
+        for i, fpath in enumerate(sorted(glob(os.path.join(reports_dir, '*_report.json')), reverse=True)):
             try:
                 with open(fpath) as f:
                     meta = json.load(f)
@@ -50,6 +50,8 @@ def index():
                     'all_pbm_total': meta.get('summary', {}).get('all_pbm_total', 0.0),
                     'pharmacy_name': meta.get('pharmacy_name', ''),
                     'date_range': meta.get('date_range', ''),
+                    'is_latest': i == 0,
+                    'csv_backup_path': meta.get('csv_backup_path'),
                 })
             except Exception:
                 pass
@@ -121,341 +123,334 @@ def upload_file():
                 vf.save(dest)
                 vendor_paths.append(dest)
 
-    # ---- Build summary for review (processors, total Rx, $ by processor) ----
-    log_df = pd.read_csv(custom_log_path, dtype=str)
-    log_df, _status_col, _kept_rows, _dropped_rows = _filter_custom_log_transmitted_paid_ins(log_df)
-    bin_df = pd.read_csv(bin_master_path, dtype=str)
-    # Normalize BIN columns
-    for col in ['Plan 1 BIN', 'Plan 2 BIN']:
-        if col in log_df.columns:
-            log_df[col] = (log_df[col].astype(str)
-                .str.replace(r'\D', '', regex=True)
-                .str.zfill(6))
+    try:
+        # ---- Build summary for review (processors, total Rx, $ by processor) ----
+        log_df = pd.read_csv(custom_log_path, dtype=str)
+        log_df, _status_col, _kept_rows, _dropped_rows = _filter_custom_log_transmitted_paid_ins(log_df)
+        bin_df = pd.read_csv(bin_master_path, dtype=str)
+        # Normalize BIN columns
+        for col in ['Plan 1 BIN', 'Plan 2 BIN']:
+            if col in log_df.columns:
+                log_df[col] = (log_df[col].astype(str)
+                    .str.replace(r'\D', '', regex=True)
+                    .str.zfill(6))
 
-    # Normalize payment columns
-    for col in ['Ins Paid Plan 1', 'Ins Paid Plan 2']:
-        if col in log_df.columns:
-            log_df[col] = pd.to_numeric(
-                log_df[col], errors='coerce'
+        # Normalize payment columns
+        for col in ['Ins Paid Plan 1', 'Ins Paid Plan 2']:
+            if col in log_df.columns:
+                log_df[col] = pd.to_numeric(
+                    log_df[col], errors='coerce'
+                ).fillna(0)
+
+        # Choose winning BIN and paid per row
+        log_df['Winning_BIN'] = log_df.apply(
+            lambda r: r['Plan 1 BIN']
+            if r['Ins Paid Plan 1'] >= r['Ins Paid Plan 2']
+            else r['Plan 2 BIN'], axis=1
+        ).str.zfill(6)
+
+        log_df['Winning_Paid'] = np.where(
+            log_df['Winning_BIN'] == log_df['Plan 1 BIN'],
+            log_df['Ins Paid Plan 1'],
+            log_df['Ins Paid Plan 2']
+        )
+
+        # Map BIN to Processor
+        bin_df['BIN'] = (bin_df['BIN'].astype(str)
+            .str.replace(r'\D', '', regex=True)
+            .str.zfill(6))
+        bin_df['Processor'] = (bin_df['Processor']
+            .astype(str).str.strip())
+        bin_to_proc = dict(zip(
+            bin_df['BIN'], bin_df['Processor']
+        ))
+
+        log_df['Processor'] = log_df['Winning_BIN'].map(bin_to_proc)
+
+        # ---- Unmapped BINs (Winning BINs with no Processor mapping) ----
+        mask_unmapped = (
+            log_df['Processor'].isna()
+            & log_df['Winning_BIN'].astype(str).str.strip().ne('')
+        )
+
+        if 'Rx #' in log_df.columns:
+            unmapped_grp = (
+                log_df.loc[mask_unmapped]
+                .groupby('Winning_BIN', as_index=False)
+                .agg(rx_count=('Rx #', lambda s: s.astype(str).str.strip()
+                               .replace('', np.nan).dropna().nunique()))
+            )
+        else:
+            unmapped_grp = (
+                log_df.loc[mask_unmapped]
+                .groupby('Winning_BIN', as_index=False)
+                .size().rename(columns={'size': 'rx_count'})
+            )
+
+        unmapped_grp = unmapped_grp.sort_values('rx_count', ascending=False)
+
+        unmapped_bins = [
+            {'bin': r['Winning_BIN'], 'rx_count': int(r['rx_count'])}
+            for _, r in unmapped_grp.iterrows()
+        ]
+        unmapped_total_bins = len(unmapped_bins)
+        unmapped_total_rx = int(
+            unmapped_grp['rx_count'].sum()) if not unmapped_grp.empty else 0
+
+        # total Rx (unique)
+        if 'Rx #' in log_df.columns:
+            total_rx = (log_df['Rx #'].astype(str).str.strip().replace(
+                '', np.nan).dropna().nunique())
+        else:
+            total_rx = len(log_df)
+
+        # Insurance only rows
+        ins_df = log_df[
+            log_df['Rx Status'].astype(str)
+            .str.strip().str.lower()
+            .str.replace(r'[^a-z]', '', regex=True)
+            .isin(['paidins', 'transmitted'])
+        ].copy()
+
+        # Group by processor
+        grp = (ins_df
+            .dropna(subset=['Processor'])
+            .groupby('Processor', as_index=False)
+            .agg(
+                rx_count=('Winning_BIN', 'count'),
+                total_paid=('Winning_Paid', 'sum')
+            )
+            .sort_values('total_paid', ascending=False)
+        )
+
+        processors = grp['Processor'].tolist()
+        by_processor = [
+            {
+                'processor': str(r['Processor']),
+                'rx_count': int(r['rx_count']),
+                'total_paid': float(r['total_paid'])
+            }
+            for _, r in grp.iterrows()
+        ]
+
+        # Add CASH separately
+        cash_df = log_df[
+            log_df['Rx Status'].astype(str)
+            .str.strip().str.lower()
+            .str.replace(r'[^a-z]', '', regex=True)
+            == 'paidcash'
+        ].copy()
+
+        if len(cash_df) > 0 and 'Total' in cash_df.columns:
+            cash_df['__total__'] = pd.to_numeric(
+                cash_df['Total'].astype(str)
+                .str.replace(',', '', regex=False)
+                .str.replace('$', '', regex=False)
+                .str.replace(r'[^0-9.\-]', '', regex=True),
+                errors='coerce'
             ).fillna(0)
 
-    # Choose winning BIN and paid per row
-    log_df['Winning_BIN'] = log_df.apply(
-        lambda r: r['Plan 1 BIN']
-        if r['Ins Paid Plan 1'] >= r['Ins Paid Plan 2']
-        else r['Plan 2 BIN'], axis=1
-    ).str.zfill(6)
+            by_processor.append({
+                'processor': 'CASH',
+                'rx_count': int(len(cash_df)),
+                'total_paid': float(cash_df['__total__'].sum())
+            })
+            processors.append('CASH')
 
-    log_df['Winning_Paid'] = np.where(
-        log_df['Winning_BIN'] == log_df['Plan 1 BIN'],
-        log_df['Ins Paid Plan 1'],
-        log_df['Ins Paid Plan 2']
-    )
+        # ✅ expose sheet choices for the modal
+        sheets_available = [
+            "Processed Data",
+            "Needs to be ordered - All",
+            "Do Not Order - ALL",
+            "Never Ordered - Check",
+            "Refills 0 - Call Doctor",
+            "RX Comparison - All",
+            "RX Comparison +ve",
+            "MFP Drugs - RX",
+            "Missed Refill - Revenue Recovery",
+            "BIN to Processor",
+            "Summary"
+        ]
+        # sensible defaults (you can change in UI)
+        preselected_sheets = [
+            "Processed Data",
+            "Needs to be ordered - All",
+            "Do Not Order - ALL",
+            "Never Ordered - Check",
+            "Refills 0 - Call Doctor",
+            "MFP Drugs - RX",
+            "Missed Refill - Revenue Recovery",
+            "BIN to Processor",
+            "Summary"
+        ]
 
-    # Map BIN to Processor
-    bin_df['BIN'] = (bin_df['BIN'].astype(str)
-        .str.replace(r'\D', '', regex=True)
-        .str.zfill(6))
-    bin_df['Processor'] = (bin_df['Processor']
-        .astype(str).str.strip())
-    bin_to_proc = dict(zip(
-        bin_df['BIN'], bin_df['Processor']
-    ))
+        # ---- Insurance Paid Total (from BestRx custom log) ----
+        if 'Ins Paid Total' in log_df.columns:
+            all_pbm_total = pd.to_numeric(
+                log_df['Ins Paid Total'].astype(str)
+                .str.replace(',', '', regex=False)
+                .str.replace('$', '', regex=False)
+                .str.replace(r'[^0-9.\-]', '', regex=True),
+                errors='coerce'
+            ).fillna(0).sum()
+        else:
+            all_pbm_total = pd.to_numeric(
+                log_df.get('Winning_Paid',
+                pd.Series([0])), errors='coerce'
+            ).fillna(0).sum()
 
-    log_df['Processor'] = log_df['Winning_BIN'].map(bin_to_proc)
+        # ---- Kinray Total (Real invoices only) ----
+        kinray_raw = pd.read_csv(kinray_path, dtype=str)
 
-    # ---- Unmapped BINs (Winning BINs with no Processor mapping) ----
-    mask_unmapped = (
-        log_df['Processor'].isna()
-        & log_df['Winning_BIN'].astype(str).str.strip().ne('')
-    )
+        kinray_clean = kinray_raw[
+            kinray_raw['Invoice Number'].notna() &
+            (kinray_raw['Invoice Number'].astype(str)
+             .str.strip().ne('')) &
+            (kinray_raw['Invoice Number'].astype(str)
+             .str.strip().ne('nan')) &
+            (kinray_raw['Invoice Number'].astype(str)
+             .str.strip().ne('Invoice Number'))
+        ].copy()
 
-    if 'Rx #' in log_df.columns:
-        # count unique RX # per unmapped BIN (safer)
-        unmapped_grp = (
-            log_df.loc[mask_unmapped]
-            .groupby('Winning_BIN', as_index=False)
-            .agg(rx_count=('Rx #', lambda s: s.astype(str).str.strip()
-                           .replace('', np.nan).dropna().nunique()))
-        )
-    else:
-        # fallback: count rows
-        unmapped_grp = (
-            log_df.loc[mask_unmapped]
-            .groupby('Winning_BIN', as_index=False)
-            .size().rename(columns={'size': 'rx_count'})
-        )
-
-    unmapped_grp = unmapped_grp.sort_values('rx_count', ascending=False)
-
-    unmapped_bins = [
-        {'bin': r['Winning_BIN'], 'rx_count': int(r['rx_count'])}
-        for _, r in unmapped_grp.iterrows()
-    ]
-    unmapped_total_bins = len(unmapped_bins)
-    unmapped_total_rx = int(
-        unmapped_grp['rx_count'].sum()) if not unmapped_grp.empty else 0
-
-    # total Rx (unique)
-    if 'Rx #' in log_df.columns:
-        total_rx = (log_df['Rx #'].astype(str).str.strip().replace(
-            '', np.nan).dropna().nunique())
-    else:
-        total_rx = len(log_df)
-
-    # Insurance only rows
-    ins_df = log_df[
-        log_df['Rx Status'].astype(str)
-        .str.strip().str.lower()
-        .str.replace(r'[^a-z]', '', regex=True)
-        .isin(['paidins', 'transmitted'])
-    ].copy()
-
-    # Group by processor
-    grp = (ins_df
-        .dropna(subset=['Processor'])
-        .groupby('Processor', as_index=False)
-        .agg(
-            rx_count=('Winning_BIN', 'count'),
-            total_paid=('Winning_Paid', 'sum')
-        )
-        .sort_values('total_paid', ascending=False)
-    )
-
-    processors = grp['Processor'].tolist()
-    by_processor = [
-        {
-            'processor': str(r['Processor']),
-            'rx_count': int(r['rx_count']),
-            'total_paid': float(r['total_paid'])
-        }
-        for _, r in grp.iterrows()
-    ]
-
-    # Add CASH separately
-    cash_df = log_df[
-        log_df['Rx Status'].astype(str)
-        .str.strip().str.lower()
-        .str.replace(r'[^a-z]', '', regex=True)
-        == 'paidcash'
-    ].copy()
-
-    if len(cash_df) > 0 and 'Total' in cash_df.columns:
-        cash_df['__total__'] = pd.to_numeric(
-            cash_df['Total'].astype(str)
+        kinray_clean['__price__'] = pd.to_numeric(
+            kinray_clean['Invoice $'].astype(str)
             .str.replace(',', '', regex=False)
             .str.replace('$', '', regex=False)
+            .str.replace('(', '-', regex=False)
+            .str.replace(')', '', regex=False)
             .str.replace(r'[^0-9.\-]', '', regex=True),
             errors='coerce'
         ).fillna(0)
 
-        by_processor.append({
-            'processor': 'CASH',
-            'rx_count': int(len(cash_df)),
-            'total_paid': float(cash_df['__total__'].sum())
+        total_kinray = float(kinray_clean['__price__'].sum())
+        print(f'[DEBUG] Kinray clean rows: {len(kinray_clean)}')
+        print(f'[DEBUG] Kinray total: {total_kinray}')
+        print(f'[DEBUG] Service total: {kinray_clean[kinray_clean["Type"] == "Service"]["__price__"].sum()}')
+        kinray_rows = len(kinray_clean)
+        kinray_ndcs = int(kinray_clean['NDC/UPC'].nunique())
+
+        # === Branded drugs purchased but not billed ===
+        branded_not_billed = []
+
+        try:
+            branded_kinray = kinray_clean[
+                kinray_clean['Type'] == 'Branded Drug'
+            ].copy()
+
+            branded_kinray['NDC_norm'] = (
+                branded_kinray['NDC/UPC'].astype(str)
+                .str.replace(r'\D', '', regex=True)
+                .str.lstrip('0')
+            )
+
+            log_df['NDC_norm'] = (
+                log_df['Drug NDC'].astype(str)
+                .str.replace(r'\D', '', regex=True)
+                .str.lstrip('0')
+            )
+
+            billed_ndcs = set(log_df['NDC_norm'].unique())
+
+            branded_grp = (
+                branded_kinray
+                .groupby(['NDC_norm', 'Description'])
+                .agg(total_cost=('__price__', 'sum'))
+                .reset_index()
+                .sort_values('total_cost', ascending=False)
+            )
+
+            never_billed = branded_grp[
+                ~branded_grp['NDC_norm'].isin(billed_ndcs)
+            ]
+
+            VACCINE_KEYWORDS = [
+                'SHINGRIX', 'PREVNAR', 'FLUZONE',
+                'FLUARIX', 'FLUCELVAX', 'PNEUMOVAX',
+                'BEXSERO', 'TRUMENBA', 'GARDASIL',
+                'VARIVAX', 'PROQUAD', 'ZOSTAVAX',
+                'RECOMBIVAX', 'ENGERIX', 'TWINRIX',
+                'HAVRIX', 'VAQTA', 'TDVAX', 'BOOSTRIX',
+                'DAPTACEL', 'INFANRIX', 'PEDIARIX'
+            ]
+
+            for _, row in never_billed.iterrows():
+                desc = str(row['Description']).upper()
+                is_vaccine = any(v in desc for v in VACCINE_KEYWORDS)
+                branded_not_billed.append({
+                    'drug': str(row['Description']),
+                    'cost': float(row['total_cost']),
+                    'is_vaccine': is_vaccine,
+                    'status': 'Vaccine — billed separately' if is_vaccine else 'Investigate'
+                })
+
+        except Exception as e:
+            print(f'[DEBUG] Branded not billed error: {e}')
+
+        # Breakdown by Type
+        kinray_by_type = []
+        if 'Type' in kinray_clean.columns:
+            type_grp = (
+                kinray_clean.groupby('Type')['__price__']
+                .sum()
+                .sort_values(ascending=False)
+                .reset_index()
+            )
+            kinray_by_type = [
+                {
+                    'type': str(r['Type']),
+                    'total': float(r['__price__'])
+                }
+                for _, r in type_grp.iterrows()
+                if str(r['Type']).strip() not in ('', 'nan', 'Type')
+            ]
+
+        summary = {
+            "total_rx": int(log_df.shape[0]),
+            "processors": processors,
+            "by_processor": by_processor,
+            "unmapped_bins": unmapped_bins,
+            "unmapped_total_bins": unmapped_total_bins,
+            "unmapped_total_rx": unmapped_total_rx,
+            "note_unmapped": "Update the BIN Master file to map these BINs to processors.",
+            "all_pbm_total": float(all_pbm_total),
+            "total_kinray": total_kinray,
+            "kinray_rows": kinray_rows,
+            "kinray_ndcs": kinray_ndcs,
+            "kinray_by_type": kinray_by_type,
+            "cash_rx_count": int(len(cash_df)) if len(cash_df) > 0 else 0,
+            "cash_rx_total": float(cash_df['__total__'].sum()) if len(cash_df) > 0 and '__total__' in cash_df.columns else 0.0,
+            "branded_not_billed": branded_not_billed,
+            "branded_not_billed_count": len(branded_not_billed),
+            "branded_not_billed_total": sum(d['cost'] for d in branded_not_billed),
+            "branded_not_billed_investigate_total": sum(d['cost'] for d in branded_not_billed if not d['is_vaccine']),
+        }
+
+        _JOB_CACHE[job_id] = {
+            "paths": {
+                "job_dir": job_dir,
+                "custom_log": custom_log_path,
+                "kinray": kinray_path,
+                "bin_master": bin_master_path,
+                "all_pbm": all_pbm_path,
+                "vendors": vendor_paths,
+            },
+            "pharmacy_name": pharmacy_name,
+            "date_range": date_range,
+            "summary": summary
+        }
+
+        return jsonify({
+            "ok": True,
+            "job_id": job_id,
+            "summary": summary
         })
-        processors.append('CASH')
-
-    # ✅ expose sheet choices for the modal
-    sheets_available = [
-        "Processed Data",
-        "Needs to be ordered - All",
-        "Do Not Order - ALL",
-        "Never Ordered - Check",
-        "Refills 0 - Call Doctor",
-        "RX Comparison - All",
-        "RX Comparison +ve",
-        "MFP Drugs - RX",
-        "Missed Refill - Revenue Recovery",
-        "BIN to Processor",
-        "Summary"
-    ]
-    # sensible defaults (you can change in UI)
-    preselected_sheets = [
-        "Processed Data",
-        "Needs to be ordered - All",
-        "Do Not Order - ALL",
-        "Never Ordered - Check",
-        "Refills 0 - Call Doctor",
-        "MFP Drugs - RX",
-        "Missed Refill - Revenue Recovery",
-        "BIN to Processor",
-        "Summary"
-    ]
-
-    # ---- Insurance Paid Total (from BestRx custom log) ----
-    if 'Ins Paid Total' in log_df.columns:
-        all_pbm_total = pd.to_numeric(
-            log_df['Ins Paid Total'].astype(str)
-            .str.replace(',', '', regex=False)
-            .str.replace('$', '', regex=False)
-            .str.replace(r'[^0-9.\-]', '', regex=True),
-            errors='coerce'
-        ).fillna(0).sum()
-    else:
-        # Fallback: sum winning paid per row
-        all_pbm_total = pd.to_numeric(
-            log_df.get('Winning_Paid',
-            pd.Series([0])), errors='coerce'
-        ).fillna(0).sum()
-
-    # ---- Kinray Total (Real invoices only) ----
-    kinray_raw = pd.read_csv(kinray_path, dtype=str)
-
-    # Remove subtotal/header rows — keep only rows with a valid Invoice Number
-    kinray_clean = kinray_raw[
-        kinray_raw['Invoice Number'].notna() &
-        (kinray_raw['Invoice Number'].astype(str)
-         .str.strip().ne('')) &
-        (kinray_raw['Invoice Number'].astype(str)
-         .str.strip().ne('nan')) &
-        (kinray_raw['Invoice Number'].astype(str)
-         .str.strip().ne('Invoice Number'))
-    ].copy()
-
-    # Clean Invoice $ column (parentheses = negative, e.g. ($5,877.29) → -5877.29)
-    kinray_clean['__price__'] = pd.to_numeric(
-    kinray_clean['Invoice $'].astype(str)
-    .str.replace(',', '', regex=False)
-    .str.replace('$', '', regex=False)
-    .str.replace('(', '-', regex=False)
-    .str.replace(')', '', regex=False)
-    .str.replace(r'[^0-9.\-]', '', regex=True),
-    errors='coerce'
-).fillna(0)
-
-    total_kinray = float(kinray_clean['__price__'].sum())
-    print(f'[DEBUG] Kinray clean rows: {len(kinray_clean)}')
-    print(f'[DEBUG] Kinray total: {total_kinray}')
-    print(f'[DEBUG] Service total: {kinray_clean[kinray_clean["Type"] == "Service"]["__price__"].sum()}')
-    kinray_rows = len(kinray_clean)
-    kinray_ndcs = int(
-        kinray_clean['NDC/UPC'].nunique()
-    )
-
-    # === Branded drugs purchased but not billed ===
-    branded_not_billed = []
-
-    try:
-        # Get branded drugs from Kinray
-        branded_kinray = kinray_clean[
-            kinray_clean['Type'] == 'Branded Drug'
-        ].copy()
-
-        # Normalize NDC — strip all non-digits then strip leading zeros for matching
-        branded_kinray['NDC_norm'] = (
-            branded_kinray['NDC/UPC'].astype(str)
-            .str.replace(r'\D', '', regex=True)
-            .str.lstrip('0')
-        )
-
-        log_df['NDC_norm'] = (
-            log_df['Drug NDC'].astype(str)
-            .str.replace(r'\D', '', regex=True)
-            .str.lstrip('0')
-        )
-
-        # Get all billed NDCs from custom log
-        billed_ndcs = set(log_df['NDC_norm'].unique())
-
-        # Group branded by NDC
-        branded_grp = (
-            branded_kinray
-            .groupby(['NDC_norm', 'Description'])
-            .agg(total_cost=('__price__', 'sum'))
-            .reset_index()
-            .sort_values('total_cost', ascending=False)
-        )
-
-        # Find ones never billed
-        never_billed = branded_grp[
-            ~branded_grp['NDC_norm'].isin(billed_ndcs)
-        ]
-
-        # Known vaccine NDC keywords
-        VACCINE_KEYWORDS = [
-            'SHINGRIX', 'PREVNAR', 'FLUZONE',
-            'FLUARIX', 'FLUCELVAX', 'PNEUMOVAX',
-            'BEXSERO', 'TRUMENBA', 'GARDASIL',
-            'VARIVAX', 'PROQUAD', 'ZOSTAVAX',
-            'RECOMBIVAX', 'ENGERIX', 'TWINRIX',
-            'HAVRIX', 'VAQTA', 'TDVAX', 'BOOSTRIX',
-            'DAPTACEL', 'INFANRIX', 'PEDIARIX'
-        ]
-
-        for _, row in never_billed.iterrows():
-            desc = str(row['Description']).upper()
-            is_vaccine = any(v in desc for v in VACCINE_KEYWORDS)
-            branded_not_billed.append({
-                'drug': str(row['Description']),
-                'cost': float(row['total_cost']),
-                'is_vaccine': is_vaccine,
-                'status': 'Vaccine — billed separately' if is_vaccine else 'Investigate'
-            })
-
     except Exception as e:
-        print(f'[DEBUG] Branded not billed error: {e}')
-
-    # Breakdown by Type
-    kinray_by_type = []
-    if 'Type' in kinray_clean.columns:
-        type_grp = (
-            kinray_clean.groupby('Type')['__price__']
-            .sum()
-            .sort_values(ascending=False)
-            .reset_index()
-        )
-        kinray_by_type = [
-            {
-                'type': str(r['Type']),
-                'total': float(r['__price__'])
-            }
-            for _, r in type_grp.iterrows()
-            if str(r['Type']).strip() not in ('', 'nan', 'Type')
-        ]
-
-    summary = {
-        "total_rx": int(log_df.shape[0]),
-        "processors": processors,
-        "by_processor": by_processor,
-        "unmapped_bins": unmapped_bins,                # [{bin, rx_count}, ...]
-        "unmapped_total_bins": unmapped_total_bins,    # e.g., 7
-        "unmapped_total_rx": unmapped_total_rx,        # e.g., 128
-        "note_unmapped": "Update the BIN Master file to map these BINs to processors.",
-        "all_pbm_total": float(all_pbm_total),
-        "total_kinray": total_kinray,
-        "kinray_rows": kinray_rows,
-        "kinray_ndcs": kinray_ndcs,
-        "kinray_by_type": kinray_by_type,
-        "cash_rx_count": int(len(cash_df)) if len(cash_df) > 0 else 0,
-        "cash_rx_total": float(cash_df['__total__'].sum()) if len(cash_df) > 0 and '__total__' in cash_df.columns else 0.0,
-        "branded_not_billed": branded_not_billed,
-        "branded_not_billed_count": len(branded_not_billed),
-        "branded_not_billed_total": sum(d['cost'] for d in branded_not_billed),
-        "branded_not_billed_investigate_total": sum(d['cost'] for d in branded_not_billed if not d['is_vaccine']),
-    }
-
-    # cache minimal job context for finalize
-    _JOB_CACHE[job_id] = {
-        "paths": {
-            "job_dir": job_dir,
-            "custom_log": custom_log_path,
-            "kinray": kinray_path,
-            "bin_master": bin_master_path,
-            "all_pbm": all_pbm_path,
-            "vendors": vendor_paths,
-        },
-        "pharmacy_name": pharmacy_name,
-        "date_range": date_range,
-        "summary": summary
-    }
-
-    # respond with job + summary (front-end will open the modal)
-    return jsonify({
-        "ok": True,
-        "job_id": job_id,
-        "summary": summary
-    })
+        return jsonify({
+            'success': False,
+            'error': 'Upload failed',
+            'message': str(e),
+            'hint': 'Please check your CSV files and try again.'
+        }), 400
 
 
 @bp.route('/email', methods=['POST'])
@@ -692,6 +687,17 @@ def finalize_job():
             reports_dir = os.path.join(current_app.root_path, 'reports')
             os.makedirs(reports_dir, exist_ok=True)
             ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+            csv_backup_path = None
+            try:
+                backup_dir = os.path.join(reports_dir, f'{ts}_csvs')
+                os.makedirs(backup_dir, exist_ok=True)
+                for src in [paths.get('custom_log'), paths.get('kinray'),
+                            paths.get('bin_master'), paths.get('all_pbm')]:
+                    if src and os.path.exists(src):
+                        shutil.copy2(src, backup_dir)
+                csv_backup_path = backup_dir
+            except Exception as _e:
+                print(f'[finalize] csv backup error: {_e}')
             report_meta = {
                 'generated_at': datetime.now().isoformat(),
                 'excel_path': main_path,
@@ -699,6 +705,7 @@ def finalize_job():
                 'date_range': ctx.get('date_range', ''),
                 'summary': ctx.get('summary', {}),
                 'paths': ctx.get('paths', {}),
+                'csv_backup_path': csv_backup_path,
             }
             with open(os.path.join(reports_dir, f'{ts}_report.json'), 'w') as f:
                 json.dump(report_meta, f)
@@ -721,7 +728,13 @@ def finalize_job():
 
 
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return render_template('error.html',
+            title='Report Generation Failed',
+            message=str(e),
+            hint='Please try re-uploading your CSV files and running again.',
+            back_url='/',
+            back_label='Go Back to Upload'
+        ), 500
 
 
 @bp.route('/dashboard')
@@ -730,6 +743,15 @@ def dashboard():
     ctx = _JOB_CACHE.get(job_id)
     if not ctx:
         return redirect('/')
+
+    if not ctx.get('summary'):
+        return render_template('error.html',
+            title='No Report Loaded',
+            message='No report data found in memory.',
+            hint='Please select a past report or upload new CSV files to continue.',
+            back_url='/',
+            back_label='Go to Home'
+        ), 404
 
     try:
         log_df = pd.read_csv(ctx['paths']['custom_log'], dtype=str)
@@ -1010,12 +1032,73 @@ def dashboard():
     )
 
 
+def _apply_sheet_filters(rows, columns, sheet_key, search, severity, drug_type, processor):
+    SEV_THRESHOLDS = {
+        'needs_ordering': {'high': 5,  'med_min': 2, 'med_max': 4},
+        'do_not_order':   {'high': 10, 'med_min': 5, 'med_max': 10},
+    }
+    name_idx = next((i for i, c in enumerate(columns) if 'drug' in c.lower() and 'name' in c.lower()), -1)
+    ndc_idx  = next((i for i, c in enumerate(columns) if 'ndc' in c.lower()), -1)
+    type_idx = next((i for i, c in enumerate(columns) if c == 'Drug Type'), -1)
+    sev_col_name = {'needs_ordering': 'To Order', 'do_not_order': 'Do Not Order'}.get(sheet_key, '')
+    sev_col_idx  = next((i for i, c in enumerate(columns) if c == sev_col_name), -1)
+
+    if search:
+        rows = [r for r in rows if
+            (name_idx >= 0 and search in str(r[name_idx]).lower()) or
+            (ndc_idx  >= 0 and search in str(r[ndc_idx]).lower())]
+
+    if severity and sheet_key in SEV_THRESHOLDS:
+        thresh = SEV_THRESHOLDS[sheet_key]
+        def _get_sev(row):
+            if sev_col_idx < 0:
+                return 'low'
+            try:
+                v = abs(float(str(row[sev_col_idx]).replace(',', '') or 0))
+            except (ValueError, TypeError):
+                v = 0
+            if v > thresh['high']:
+                return 'high'
+            if thresh['med_min'] <= v <= thresh['med_max']:
+                return 'med'
+            return 'low'
+        rows = [r for r in rows if _get_sev(r) == severity]
+
+    if drug_type and type_idx >= 0:
+        if drug_type == 'Unclassified':
+            rows = [r for r in rows if str(r[type_idx]).strip() == 'Unclassified']
+        else:
+            rows = [r for r in rows if str(r[type_idx]).strip() in (drug_type, 'Unclassified')]
+
+    if processor:
+        include_procs = {p.strip() for p in processor.split(',') if p.strip()}
+        proc_indices = [i for i, c in enumerate(columns)
+                        if (c.endswith('_D') or c.endswith('_d')) and c != 'ALL_PBM_D'
+                        and c in include_procs]
+        if proc_indices:
+            def _has_proc(row):
+                for i in proc_indices:
+                    try:
+                        if float(str(row[i]).replace(',', '')) > 0:
+                            return True
+                    except (ValueError, TypeError):
+                        pass
+                return False
+            rows = [r for r in rows if _has_proc(r)]
+
+    return rows
+
+
 @bp.route('/api/sheet_data')
 def sheet_data():
-    job_id = request.args.get('job_id', '')
-    sheet = request.args.get('sheet', '')
-    page = request.args.get('page', 1, type=int)
-    per_page = 50
+    job_id    = request.args.get('job_id', '')
+    sheet     = request.args.get('sheet', '')
+    page      = request.args.get('page', 1, type=int)
+    per_page  = 50
+    search    = (request.args.get('search')    or '').strip().lower()
+    severity  = (request.args.get('severity')  or '').strip()
+    drug_type = (request.args.get('drug_type') or '').strip()
+    processor = (request.args.get('processor') or '').strip()
 
     ctx = _JOB_CACHE.get(job_id)
     if not ctx:
@@ -1026,38 +1109,120 @@ def sheet_data():
         return jsonify({'ok': False}), 404
 
     sheet_map = {
-        'do_not_order': 'Do Not Order - ALL',
-        'needs_ordering': 'Needs to be ordered - All',
+        'do_not_order':    'Do Not Order - ALL',
+        'needs_ordering':  'Needs to be ordered - All',
         'never_purchased': 'Never Ordered - Check',
-        'rx_comparison': 'RX Comparison - All',
+        'rx_comparison':   'RX Comparison - All',
     }
-
     sheet_name = sheet_map.get(sheet)
     if not sheet_name:
         return jsonify({'ok': False}), 400
 
     try:
-        df = pd.read_excel(
-            main_file,
-            sheet_name=sheet_name,
-            dtype=str,
-            header=1
-        )
+        df = pd.read_excel(main_file, sheet_name=sheet_name, dtype=str, header=1)
         df = df.dropna(how='all').fillna('')
+        columns = df.columns.tolist()
+        rows = df.values.tolist()
 
-        total = len(df)
+        rows = _apply_sheet_filters(rows, columns, sheet, search, severity, drug_type, processor)
+
+        total_count = len(rows)
         start = (page - 1) * per_page
-        end = start + per_page
-        rows = df.iloc[start:end].values.tolist()
+        end   = start + per_page
+        page_rows = rows[start:end]
+
+        result_rows = [
+            {'row_number': start + idx + 1, 'data': row}
+            for idx, row in enumerate(page_rows)
+        ]
 
         return jsonify({
-            'ok': True,
-            'total': total,
-            'page': page,
-            'rows': rows,
-            'columns': df.columns.tolist(),
-            'has_more': end < total
+            'ok':          True,
+            'total_count': total_count,
+            'page':        page,
+            'rows':        result_rows,
+            'columns':     columns,
+            'has_more':    end < total_count,
         })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@bp.route('/api/export_excel/<sheet_key>')
+def export_excel(sheet_key):
+    from io import BytesIO
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    job_id    = request.args.get('job_id', '')
+    search    = (request.args.get('search')    or '').strip().lower()
+    severity  = (request.args.get('severity')  or '').strip()
+    drug_type = (request.args.get('drug_type') or '').strip()
+    processor = (request.args.get('processor') or '').strip()
+
+    ctx = _JOB_CACHE.get(job_id)
+    if not ctx:
+        return jsonify({'ok': False}), 404
+    main_file = ctx.get('outfile_main')
+    if not main_file or not os.path.exists(main_file):
+        return jsonify({'ok': False}), 404
+
+    sheet_map = {
+        'do_not_order':    'Do Not Order - ALL',
+        'needs_ordering':  'Needs to be ordered - All',
+        'never_purchased': 'Never Ordered - Check',
+        'rx_comparison':   'RX Comparison - All',
+    }
+    sheet_name = sheet_map.get(sheet_key)
+    if not sheet_name:
+        return jsonify({'ok': False}), 400
+
+    EXPORT_HIDDEN = {'Drug Type', 'Insurance-wise Order Estimate ($)', 'Amount'}
+
+    try:
+        df = pd.read_excel(main_file, sheet_name=sheet_name, dtype=str, header=1)
+        df = df.dropna(how='all').fillna('')
+        columns = df.columns.tolist()
+        rows = df.values.tolist()
+
+        rows = _apply_sheet_filters(rows, columns, sheet_key, search, severity, drug_type, processor)
+
+        visible = [(i, col) for i, col in enumerate(columns)
+                   if col not in EXPORT_HIDDEN and not col.lower().startswith('insurance-wise')]
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = sheet_name[:31]
+
+        hdr_font = Font(bold=True)
+        hdr_fill = PatternFill(start_color='F0F4F8', end_color='F0F4F8', fill_type='solid')
+        for col_num, (_, col_name) in enumerate(visible, start=1):
+            cell = ws.cell(row=1, column=col_num, value=col_name)
+            cell.font = hdr_font
+            cell.fill = hdr_fill
+            cell.alignment = Alignment(horizontal='center')
+
+        for row_num, row in enumerate(rows, start=2):
+            for col_num, (col_idx, _) in enumerate(visible, start=1):
+                val = row[col_idx] if col_idx < len(row) else ''
+                try:
+                    fval = float(str(val).replace(',', ''))
+                    val = int(fval) if fval == int(fval) else fval
+                except (ValueError, TypeError):
+                    pass
+                ws.cell(row=row_num, column=col_num, value=val)
+
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        safe_name = re.sub(r'[^A-Za-z0-9_-]', '_', sheet_key)
+        return send_file(
+            buf,
+            as_attachment=True,
+            download_name=f'{safe_name}.xlsx',
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
@@ -1371,27 +1536,34 @@ def sheet_rx_comparison():
 
 @bp.route('/load_report/<filename>')
 def load_report(filename):
-    safe = os.path.basename(filename)
-    if not safe.endswith('_report.json'):
-        return redirect('/')
-    reports_dir = os.path.join(current_app.root_path, 'reports')
-    path = os.path.join(reports_dir, safe)
-    if not os.path.exists(path):
-        return redirect('/')
     try:
+        safe = os.path.basename(filename)
+        if not safe.endswith('_report.json'):
+            return redirect('/')
+        reports_dir = os.path.join(current_app.root_path, 'reports')
+        path = os.path.join(reports_dir, safe)
+        if not os.path.exists(path):
+            return redirect('/')
         with open(path) as f:
             meta = json.load(f)
+        job_id = uuid4().hex
+        _JOB_CACHE[job_id] = {
+            'paths': meta.get('paths', {}),
+            'pharmacy_name': meta.get('pharmacy_name', ''),
+            'date_range': meta.get('date_range', ''),
+            'summary': meta.get('summary', {}),
+            'outfile_main': meta.get('excel_path', ''),
+            'csv_backup_path': meta.get('csv_backup_path'),
+        }
+        return redirect(url_for('main.dashboard', job_id=job_id))
     except Exception:
-        return redirect('/')
-    job_id = uuid4().hex
-    _JOB_CACHE[job_id] = {
-        'paths': meta.get('paths', {}),
-        'pharmacy_name': meta.get('pharmacy_name', ''),
-        'date_range': meta.get('date_range', ''),
-        'summary': meta.get('summary', {}),
-        'outfile_main': meta.get('excel_path', ''),
-    }
-    return redirect(url_for('main.dashboard', job_id=job_id))
+        return render_template('error.html',
+            title='Could Not Load Report',
+            message='The report file may be corrupted or missing.',
+            hint='Please try another report or upload new CSV files.',
+            back_url='/',
+            back_label='Go to Home'
+        ), 500
 
 
 @bp.route('/pick_folder', methods=['GET'])

@@ -108,21 +108,20 @@ def add_rx_unit_compare_sheet_exact(
     df['NDC'] = df['NDC #']
     df['Drug Name'] = df['Drug Name']
     df['Pkg Size'] = df['Drug Pkg Size']
-    df['Qty Filled'] = df['Qty Filled']
     df['BIN'] = df['Winning_BIN']
     df['Processor'] = df['Processor']
     df['PCN'] = df['Winning PCN']
     df['Group'] = df['Winning Group']
     df['Fill Date'] = df['Fill Date']
-    df['Kinray Final Price'] = df['Kinray final Price']
-    df['Ins Paid'] = df['Ins paid']
-    df['SDRA Amt'] = df['SDRA Amt']
-    df['COPAY'] = df['COPAY']
-    df['Total = (Ins Paid + SDRA + COPAY)'] = df['Total Ins paid']
-    df['Package Billed'] = df['Package billed']
+    df['Pkgs Billed to Insurance'] = df['Package billed']
+    df['Kinray Price (Pkgs Billed × Unit Price)'] = df['Kinray final Price']
+    df['Total Ins Paid = (Ins Paid + SDRA + COPAY)'] = df['Total Ins paid']
     out_cols = [
-        'RX', 'Fill Date', 'NDC', 'Drug Name', 'Pkg Size', 'Qty Filled',
-        'Package Billed', 'Kinray Final Price', 'Ins Paid', 'SDRA Amt', 'COPAY', 'Total = (Ins Paid + SDRA + COPAY)', 'Difference', 'BIN', 'Processor',
+        'RX', 'Fill Date', 'NDC', 'Drug Name', 'Pkg Size',
+        'Pkgs Billed to Insurance',
+        'Total Ins Paid = (Ins Paid + SDRA + COPAY)',
+        'Kinray Price (Pkgs Billed × Unit Price)',
+        'Difference', 'BIN', 'Processor',
         'PCN', 'Group'
     ]
 
@@ -169,7 +168,7 @@ def add_rx_unit_compare_sheet_exact(
                         horizontal='center', vertical='center')
 
     # ✅ Wrap specific headers
-    for cell_ref in ["E2", "F2", "G2", "L2"]:
+    for cell_ref in ["E2", "F2", "G2", "H2"]:
         ws[cell_ref].alignment = Alignment(
             horizontal='center', vertical='center', wrap_text=True)
 
@@ -181,11 +180,10 @@ def add_rx_unit_compare_sheet_exact(
             cell.border = thin
 
     widths = {
-        'RX': 9, 'NDC': 14, 'Drug Name': 45, 'Pkg Size': 8, 'Fill Date': 12,
-        'Qty Filled': 8, 'Package Billed': 9, 'Kinray Final Price': 16,
-        'Ins Paid': 14, 'SDRA Amt': 12, 'COPAY': 10, 'Total = (Ins Paid + SDRA + COPAY)': 24,
-        'Difference': 14, 'BIN': 8,
-        'PCN': 12, 'Group': 12, 'Processor': 15
+        'RX': 9, 'Fill Date': 12, 'NDC': 14, 'Drug Name': 45, 'Pkg Size': 8,
+        'Pkgs Billed to Insurance': 12, 'Kinray Price (Pkgs Billed × Unit Price)': 18,
+        'Total Ins Paid = (Ins Paid + SDRA + COPAY)': 24,
+        'Difference': 14, 'BIN': 8, 'Processor': 15, 'PCN': 12, 'Group': 12
     }
     ws.row_dimensions[2].height = 50
 
@@ -194,49 +192,34 @@ def add_rx_unit_compare_sheet_exact(
 
     # Number formats
     for r in range(3, ws.max_row + 1):
-        for name in ['Kinray Final Price', 'Ins Paid', 'SDRA Amt', 'COPAY', 'Total = (Ins Paid + SDRA + COPAY)', 'Difference']:
+        for name in ['Kinray Price (Pkgs Billed × Unit Price)', 'Total Ins Paid = (Ins Paid + SDRA + COPAY)', 'Difference']:
             idx = out_cols.index(name) + 1
             ws.cell(row=r, column=idx).number_format = '"$"#,##0.00'
         ws.cell(row=r, column=out_cols.index(
-            'Qty Filled') + 1).number_format = '0.0'
-        ws.cell(row=r, column=out_cols.index(
-            'Package Billed') + 1).number_format = '0.0'
+            'Pkgs Billed to Insurance') + 1).number_format = '0.00'
         ws.cell(row=r, column=out_cols.index(
             'Fill Date') + 1).number_format = 'yyyy-mm-dd'
 
-    diff_idx = out_cols.index('Difference') + 1
     last_data_row = ws.max_row
     total_row = last_data_row + 1
 
-    # Label cell (optional)
-    label_col = diff_idx - 1
-    label_cell = ws.cell(row=total_row, column=label_col,
-                         value="Total Difference")
+    label_cell = ws.cell(row=total_row, column=out_cols.index('Drug Name') + 1, value="TOTALS")
     label_cell.font = Font(bold=True, size=12)
     label_cell.alignment = Alignment(horizontal='center', vertical='center')
-    drug_idx = out_cols.index('Drug Name') + 1
-    diff_idx = out_cols.index('Difference') + 1
-    left_idx = min(drug_idx, diff_idx)
-    right_idx = max(drug_idx, diff_idx)
 
-    left_col = get_column_letter(left_idx)
-    right_col = get_column_letter(right_idx)
-
-    # Apply number format to Total Difference cell
-    total_diff_cell = ws.cell(row=total_row, column=diff_idx)
-    total_diff_cell.number_format = '"$"#,##0.00'
     ws.auto_filter.ref = f"A2:{get_column_letter(ws.max_column)}{last_data_row}"
 
-    # AutoSum cell
-    sum_col_letter = get_column_letter(diff_idx)
-    total_cell = ws.cell(row=total_row, column=diff_idx)
-    # total_cell.value = f"=SUM({sum_col_letter}3:{sum_col_letter}{last_data_row})"
-    total_cell.value = f"=SUBTOTAL(109,{sum_col_letter}3:{sum_col_letter}{last_data_row})"
-    total_cell.number_format = '"$"#,##0.00'  # ✅ Currency format
-
-    total_cell.font = Font(bold=True, size=12)
-    total_cell.number_format = 'General'
-    total_cell.alignment = Alignment(horizontal='center', vertical='center')
+    for col_name in ['Kinray Price (Pkgs Billed × Unit Price)', 'Total Ins Paid = (Ins Paid + SDRA + COPAY)', 'Difference']:
+        try:
+            idx = out_cols.index(col_name) + 1
+            col_letter = get_column_letter(idx)
+            tcell = ws.cell(row=total_row, column=idx)
+            tcell.value = f"=SUBTOTAL(109,{col_letter}3:{col_letter}{last_data_row})"
+            tcell.number_format = '"$"#,##0.00'
+            tcell.font = Font(bold=True, size=12)
+            tcell.alignment = Alignment(horizontal='center', vertical='center')
+        except ValueError:
+            pass
 
     # Ensure Excel recalculates when opening
     ws.parent.calculation.fullCalcOnLoad = True
@@ -373,11 +356,11 @@ def add_rx_unit_compare_sheet_exact_pos(
     df['Ins Paid'] = df['Ins paid']
     df['SDRA Amt'] = df['SDRA Amt']
     df['COPAY'] = df['COPAY']
-    df['Total = (Ins Paid + SDRA + COPAY)'] = df['Total Ins paid']
+    df['Total Ins Paid = (Ins Paid + SDRA + COPAY)'] = df['Total Ins paid']
     df['Package Billed'] = df['Package billed']
     out_cols = [
         'RX', 'Fill Date', 'NDC', 'Drug Name', 'Pkg Size', 'Qty Filled',
-        'Package Billed', 'Kinray Final Price', 'Ins Paid', 'SDRA Amt', 'COPAY', 'Total = (Ins Paid + SDRA + COPAY)', 'Difference', 'BIN', 'Processor',
+        'Package Billed', 'Kinray Final Price', 'Ins Paid', 'SDRA Amt', 'COPAY', 'Total Ins Paid = (Ins Paid + SDRA + COPAY)', 'Difference', 'BIN', 'Processor',
         'PCN', 'Group'
     ]
 
@@ -438,7 +421,7 @@ def add_rx_unit_compare_sheet_exact_pos(
     widths = {
         'RX': 9, 'NDC': 14, 'Drug Name': 45, 'Pkg Size': 8, 'Fill Date': 12,
         'Qty Filled': 8, 'Package Billed': 9, 'Kinray Final Price': 16,
-        'Ins Paid': 14, 'SDRA Amt': 12, 'COPAY': 10, 'Total = (Ins Paid + SDRA + COPAY)': 24,
+        'Ins Paid': 14, 'SDRA Amt': 12, 'COPAY': 10, 'Total Ins Paid = (Ins Paid + SDRA + COPAY)': 24,
         'Difference': 14, 'BIN': 8,
         'PCN': 12, 'Group': 12, 'Processor': 15
     }
@@ -449,7 +432,7 @@ def add_rx_unit_compare_sheet_exact_pos(
 
     # Number formats
     for r in range(3, ws.max_row + 1):
-        for name in ['Kinray Final Price', 'Ins Paid', 'SDRA Amt', 'COPAY', 'Total = (Ins Paid + SDRA + COPAY)', 'Difference']:
+        for name in ['Kinray Final Price', 'Ins Paid', 'SDRA Amt', 'COPAY', 'Total Ins Paid = (Ins Paid + SDRA + COPAY)', 'Difference']:
             idx = out_cols.index(name) + 1
             ws.cell(row=r, column=idx).number_format = '"$"#,##0.00'
         ws.cell(row=r, column=out_cols.index(
@@ -521,6 +504,10 @@ def add_mfp_drugs_sheet(
 
     for c in ['Ins Paid Plan 1', 'Ins Paid Plan 2', 'Qty Filled', 'Drug Pkg Size', 'SDRA Amt', 'COPAY']:
         df[c] = pd.to_numeric(df.get(c, 0), errors='coerce').fillna(0)
+    df['Ins Paid Total'] = pd.to_numeric(
+        df.get('Ins Paid Total', pd.Series(0, index=df.index)),
+        errors='coerce'
+    ).fillna(0)
 
     df['NDC #'] = (df['NDC #'].astype(str)
                    .str.replace('-', '', regex=False)
@@ -561,31 +548,29 @@ def add_mfp_drugs_sheet(
         0.0
     )
 
-    df['Winning Ins Paid'] = np.where(
-        df['Ins Paid Plan 1'].fillna(0) >= df['Ins Paid Plan 2'].fillna(0),
-        df['Ins Paid Plan 1'].fillna(0),
-        df['Ins Paid Plan 2'].fillna(0)
+    df['Pkgs Billed to Insurance'] = df['Package billed']
+    df['Kinray Cost (Pkgs × Unit Price)'] = df['Kinray Final Price']
+    df['Total = (SDRA + Ins Paid Total)'] = df['SDRA Amt'] + df['Ins Paid Total']
+    df['Difference'] = np.where(
+        df['Kinray Final Price'] > 0,
+        df['Total = (SDRA + Ins Paid Total)'] - df['Kinray Cost (Pkgs × Unit Price)'],
+        0.0
     )
-    df['Total Collected'] = df['Winning Ins Paid'] + df['SDRA Amt'] + df['COPAY']
-    df['Difference'] = df['Total Collected'] - df['Kinray Final Price']
 
     rx_col = 'Rx #' if 'Rx #' in df.columns else ('Rx' if 'Rx' in df.columns else None)
     df['RX'] = df[rx_col] if rx_col else pd.NA
     df['NDC'] = df['NDC #']
     df['Drug Name'] = df.get('Drug Name', '')
     df['Pkg Size'] = df.get('Drug Pkg Size', 0)
-    df['Qty Filled'] = df.get('Qty Filled', 0)
     df['BIN'] = df.get('Winning_BIN', '')
-    df['Processor'] = df.get('Processor', '')
     df['PCN'] = df.get('Winning PCN', '')
     df['Group'] = df.get('Winning Group', '')
 
     out_cols = [
-        'RX', 'Fill Date', 'NDC', 'Drug Name', 'Pkg Size', 'Qty Filled',
-        'Package billed', 'Kinray Unit Price', 'Kinray Final Price',
-        'Ins Paid Plan 1', 'Ins Paid Plan 2', 'SDRA Amt', 'COPAY',
-        'Winning Ins Paid', 'Total Collected', 'Difference',
-        'BIN', 'Processor', 'PCN', 'Group'
+        'RX', 'Fill Date', 'NDC', 'Drug Name', 'Pkg Size',
+        'Pkgs Billed to Insurance', 'Kinray Cost (Pkgs × Unit Price)',
+        'Ins Paid Total', 'SDRA Amt', 'Total = (SDRA + Ins Paid Total)',
+        'Difference', 'BIN', 'PCN', 'Group'
     ]
     out = df.loc[:, out_cols].copy().sort_values(['Drug Name', 'Fill Date'], ascending=[True, False])
 
@@ -613,29 +598,31 @@ def add_mfp_drugs_sheet(
             cell.border = thin
 
     widths = {
-        'RX': 9, 'Fill Date': 12, 'NDC': 14, 'Drug Name': 40, 'Pkg Size': 8, 'Qty Filled': 10,
-        'Package billed': 12, 'Kinray Unit Price': 14, 'Kinray Final Price': 16,
-        'Ins Paid Plan 1': 14, 'Ins Paid Plan 2': 14, 'SDRA Amt': 12, 'COPAY': 10,
-        'Winning Ins Paid': 14, 'Total Collected': 15, 'Difference': 13,
-        'BIN': 9, 'Processor': 15, 'PCN': 12, 'Group': 12
+        'RX': 9, 'Fill Date': 12, 'NDC': 14, 'Drug Name': 40, 'Pkg Size': 8,
+        'Pkgs Billed to Insurance': 12, 'Kinray Price (Pkgs × Unit Price)': 14,
+        'Ins Paid Total': 12, 'SDRA Amt': 10,
+        'Total = (SDRA + Ins Paid Total)': 14, 'Difference': 12,
+        'BIN': 9, 'PCN': 12, 'Group': 12
     }
     ws.row_dimensions[2].height = 45
     for i, name in enumerate(out_cols, start=1):
         ws.column_dimensions[get_column_letter(i)].width = widths.get(name, 12)
 
     currency_cols = {
-        'Kinray Unit Price', 'Kinray Final Price',
-        'Ins Paid Plan 1', 'Ins Paid Plan 2', 'SDRA Amt', 'COPAY',
-        'Winning Ins Paid', 'Total Collected', 'Difference'
+        'Kinray Price (Pkgs × Unit Price)', 'Ins Paid Total', 'SDRA Amt',
+        'Total = (SDRA + Ins Paid Total)', 'Difference'
+    }
+    number_cols = {
+        'Pkgs Billed to Insurance': '0.00',
+        'Fill Date': 'yyyy-mm-dd'
     }
     for r in range(3, ws.max_row + 1):
         for name in out_cols:
             idx = out_cols.index(name) + 1
             if name in currency_cols:
                 ws.cell(row=r, column=idx).number_format = '"$"#,##0.00'
-        ws.cell(row=r, column=out_cols.index('Qty Filled') + 1).number_format = '0.0'
-        ws.cell(row=r, column=out_cols.index('Package billed') + 1).number_format = '0.0'
-        ws.cell(row=r, column=out_cols.index('Fill Date') + 1).number_format = 'yyyy-mm-dd'
+            elif name in number_cols:
+                ws.cell(row=r, column=idx).number_format = number_cols[name]
 
     last_data_row = ws.max_row
     total_row = last_data_row + 1
@@ -643,8 +630,8 @@ def add_mfp_drugs_sheet(
     ws.cell(row=total_row, column=label_col, value='Totals').font = Font(bold=True)
     ws.cell(row=total_row, column=label_col).alignment = Alignment(horizontal='right', vertical='center')
 
-    for name in ['Kinray Final Price', 'Ins Paid Plan 1', 'Ins Paid Plan 2', 'SDRA Amt', 'COPAY',
-                 'Winning Ins Paid', 'Total Collected', 'Difference']:
+    for name in ['Kinray Price (Pkgs × Unit Price)', 'Ins Paid Total', 'SDRA Amt',
+                 'Total = (SDRA + Ins Paid Total)', 'Difference']:
         idx = out_cols.index(name) + 1
         col_letter = get_column_letter(idx)
         tcell = ws.cell(row=total_row, column=idx)

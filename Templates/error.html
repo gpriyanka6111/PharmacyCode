@@ -1,1 +1,42 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }} — PharmaTrack</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --brand: #0f4c81; }
+    body { font-family: 'DM Sans', sans-serif; background: #f8fafc; color: #1a2332; }
+    .error-card {
+      max-width: 520px; margin: 80px auto; background: #fff;
+      border-radius: 16px; padding: 48px 40px; text-align: center;
+      box-shadow: 0 4px 24px rgba(15,76,129,.08);
+    }
+    .error-icon { font-size: 3.5rem; margin-bottom: 20px; }
+    .error-title { font-size: 1.5rem; font-weight: 700; color: var(--brand); margin-bottom: 8px; }
+    .error-message { font-size: 0.95rem; color: #64748b; margin-bottom: 24px; }
+    .hint-box {
+      background: #e8f0fe; border-left: 4px solid var(--brand);
+      border-radius: 8px; padding: 14px 18px; text-align: left;
+      font-size: 0.9rem; color: #1a3a5c; margin-bottom: 32px;
+    }
+    .btn-brand {
+      background: var(--brand); color: #fff; border: none;
+      padding: 12px 32px; border-radius: 8px; font-weight: 600;
+      font-size: 0.95rem; text-decoration: none; display: inline-block;
+    }
+    .btn-brand:hover { background: #0a3760; color: #fff; }
+  </style>
+</head>
+<body>
+  <div class="error-card">
+    <div class="error-icon">⚠️</div>
+    <div class="error-title">{{ title }}</div>
+    <div class="error-message">{{ message }}</div>
+    <div class="hint-box">ℹ️ &nbsp;{{ hint }}</div>
+    <a href="{{ back_url }}" class="btn-brand">{{ back_label }}</a>
+  </div>
+</body>
+</html>

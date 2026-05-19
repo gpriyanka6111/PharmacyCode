@@ -50,16 +50,20 @@ def parse_vendor_files(vendor_paths):
         lower_to_orig = {c.lower(): c for c in raw.columns}
 
         # Required columns (robust to vendor variations)
-        ndc_col = _pick(lower_to_orig, ['ndc/upc', 'ndc #', 'ndc', 'ndc#', 'ndc number',
-                        'ndc no', 'ndc upc', 'ndcupc', 'NDC/UPC', 'Item NDC/UPC (Current)'])
-        ship_col = _pick(lower_to_orig, ['ship qty', 'shipped', 'shipped qty', 'qty shipped',
-                         'quantity shipped', 'ship quantity', 'qty', 'Ship Qty', 'Purchase History Ordered Quantity'])
-        price_col = _pick(lower_to_orig, [
-                          'invoice $', 'invoice$', 'invoice amount', 'invoice', 'price', 'Invoice $'])
+        ndc_col   = _pick(lower_to_orig, ['ndc/upc', 'ndc #', 'ndc', 'ndc#', 'ndc number', 'ndc no'])
+        ship_col  = _pick(lower_to_orig, ['shipped qty', 'ship qty', 'shipped', 'qty shipped', 'quantity shipped'])
+        price_col = _pick(lower_to_orig, ['invoice $', 'invoice$', 'invoice amount', 'invoice', 'price'])
+        type_col = _pick(lower_to_orig, ['type', 'drug type', 'item type', 'product type'])
 
         if not ndc_col or not ship_col or not price_col:
             raise ValueError(
                 f"Vendor file '{os.path.basename(vp)}' must contain NDC/UPC, Ship Qty, and Invoice $ (or equivalents). "
+                f"Found: {list(raw.columns)}"
+            )
+        _is_kinray_file = 'kinray' in os.path.basename(vp).lower()
+        if _is_kinray_file and not type_col:
+            raise ValueError(
+                f"Kinray file '{os.path.basename(vp)}' must contain a 'Type' column. "
                 f"Found: {list(raw.columns)}"
             )
 
@@ -78,7 +82,8 @@ def parse_vendor_files(vendor_paths):
 
         keep_cols = [ndc_col, ship_col, price_col] \
             + ([date_col] if date_col else []) \
-            + ([ourcase_col] if ourcase_col else [])
+            + ([ourcase_col] if ourcase_col else []) \
+            + ([type_col] if type_col else [])
 
         v = raw[keep_cols].copy()
 
@@ -88,7 +93,11 @@ def parse_vendor_files(vendor_paths):
             rename_map[date_col] = 'DATE'
         if ourcase_col:
             rename_map[ourcase_col] = 'OURCASE'
+        if type_col:
+            rename_map[type_col] = 'TYPE'
         v.rename(columns=rename_map, inplace=True)
+        if 'TYPE' in v.columns:
+            v['TYPE'] = v['TYPE'].astype(str).str.strip().str.upper()
         # if drug_col:
         #     rename_map[drug_col] = 'Drug Name'   # 🔹 NEW
         # DATE
@@ -164,10 +173,10 @@ def parse_vendor_files(vendor_paths):
         is_kinray = 'kinray' in os.path.basename(vp).lower()
         if is_kinray:
             # keep all selectors we need to decide "latest"
-            kinray_rows.append(
-                v[['NDC #', 'DATE', 'OURCASE', 'Shipped',
-                    'PRICE', '__UnitPrice__']].copy()
-            )
+            kinray_cols = ['NDC #', 'DATE', 'OURCASE', 'Shipped', 'PRICE', '__UnitPrice__']
+            if 'TYPE' in v.columns:
+                kinray_cols.append('TYPE')
+            kinray_rows.append(v[kinray_cols].copy())
 
         # Collect for aggregation/pivots
         vendor_frames_qty.append(v[['NDC #', 'Vendor', 'Shipped']])
@@ -240,7 +249,7 @@ def parse_vendor_files(vendor_paths):
             .rename(columns={'__UnitPrice__': 'Kinray_UPrice'})
         )
     else:
-        kinray_all = pd.DataFrame(columns=['NDC #', 'DATE', 'OURCASE', 'Shipped', 'PRICE', '__UnitPrice__'])
+        kinray_all = pd.DataFrame(columns=['NDC #', 'DATE', 'OURCASE', 'Shipped', 'PRICE', '__UnitPrice__', 'TYPE'])
         kinray_latest = pd.DataFrame(columns=['NDC #', 'Kinray_UPrice'])
 
     kinray_price_map = dict(

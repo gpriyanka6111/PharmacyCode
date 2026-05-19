@@ -3,7 +3,8 @@ Test Data _ feb/
 TestData-March/
 processed/
 uploads/
-reports/
+app$.py/
+
 
 # Python bytecode
 __pycache__/

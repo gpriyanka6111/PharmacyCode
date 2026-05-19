@@ -1,6 +1,8 @@
 # Builds the "Summary" sheet: processor-level Insurance $, Purchased $, Net, and Order Estimate rows.
 
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.chart import BarChart, PieChart, Reference
+from openpyxl.chart.series import DataPoint
 from openpyxl.utils import get_column_letter
 
 
@@ -12,6 +14,7 @@ def add_summary_sheet(
     data_start_row=4,
     pharmacy_name=None,
     date_range=None,
+    final_data=None,
 ):
     """
     Builds a 'Summary' sheet with columns = processors (+ ALL_PBM if present) and rows:
@@ -242,3 +245,81 @@ def add_summary_sheet(
                               end_color="D0CECE", fill_type="solid")
     for c in range(1, ws.max_column + 1):
         ws.cell(row=header_base_row, column=c).fill = header_fill
+
+    kpi_start_row = 9
+    last_proc_col = get_column_letter(len(processors) + 1)
+    kpi_items = [
+        ("Total Revenue", f"=SUM(B{row_paid}:{last_proc_col}{row_paid})"),
+        ("Total Purchased", f"=SUM(B{row_pur}:{last_proc_col}{row_pur})"),
+        ("Net Profit", f"=SUM(B{row_net}:{last_proc_col}{row_net})"),
+        ("Needs Ordering", f"=SUM(B{row_est}:{last_proc_col}{row_est})"),
+        ("Never Ordered", 0),
+    ]
+    if "Never Ordered - Check" in wb.sheetnames:
+        nr = wb["Never Ordered - Check"].max_row
+        kpi_items[-1] = ("Never Ordered", f"=MAX(COUNTA('Never Ordered - Check'!A3:A{nr}),0)")
+    kpi_colors = ["1F6FBF", "00A86B", "E05C1A", "7B4EA3", "6B7280"]
+    for i, (label, formula) in enumerate(kpi_items):
+        col = i * 2 + 1
+        label_cell = ws.cell(row=kpi_start_row, column=col, value=label)
+        label_cell.fill = PatternFill(start_color=kpi_colors[i],
+                                      end_color=kpi_colors[i], fill_type="solid")
+        label_cell.font = Font(bold=True, color="FFFFFF", size=10)
+        label_cell.alignment = Alignment(horizontal="center", vertical="center")
+        value_cell = ws.cell(row=kpi_start_row + 1, column=col, value=formula)
+        value_cell.number_format = '"$"#,##0.00' if i < 4 else '#,##0'
+        value_cell.font = Font(bold=True, size=12)
+        value_cell.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[kpi_start_row].height = 20
+    ws.row_dimensions[kpi_start_row + 1].height = 24
+
+    try:
+        bar = BarChart()
+        bar.type = "col"
+        bar.title = "Revenue by Processor"
+        bar.y_axis.title = "Amount ($)"
+        bar.x_axis.title = "Processor"
+        bar.style = 10
+        bar.width = 18
+        bar.height = 12
+        data_ref = Reference(ws, min_col=2, max_col=len(processors) + 1,
+                             min_row=row_paid, max_row=row_paid)
+        cats = Reference(ws, min_col=2, max_col=len(processors) + 1,
+                         min_row=header_base_row)
+        bar.add_data(data_ref)
+        bar.set_categories(cats)
+        bar.series[0].title = "Insurance Paid"
+        chart_col = get_column_letter(len(processors) + 3)
+        ws.add_chart(bar, f"{chart_col}1")
+    except Exception:
+        pass
+
+    try:
+        if final_data is not None and 'Drug Type' in final_data.columns:
+            type_counts = final_data['Drug Type'].value_counts()
+            data_col = len(processors) + 8
+            type_labels = ['Branded', 'Generic', 'OTC', 'Unclassified']
+            pie_start_row = 12
+            for r, label in enumerate(type_labels, start=pie_start_row):
+                ws.cell(row=r, column=data_col, value=label)
+                ws.cell(row=r, column=data_col + 1,
+                        value=int(type_counts.get(label, 0)))
+            ws.column_dimensions[get_column_letter(data_col)].hidden = True
+            ws.column_dimensions[get_column_letter(data_col + 1)].hidden = True
+            pie = PieChart()
+            pie.title = "Drug Type Breakdown"
+            pie.style = 10
+            pie.width = 14
+            pie.height = 12
+            data_ref_pie = Reference(ws, min_col=data_col + 1,
+                                     max_col=data_col + 1, min_row=pie_start_row,
+                                     max_row=pie_start_row + len(type_labels) - 1)
+            cats_pie = Reference(ws, min_col=data_col, max_col=data_col,
+                                 min_row=pie_start_row,
+                                 max_row=pie_start_row + len(type_labels) - 1)
+            pie.add_data(data_ref_pie)
+            pie.set_categories(cats_pie)
+            pie.dataLabels = None
+            ws.add_chart(pie, f"{chart_col}14")
+    except Exception:
+        pass

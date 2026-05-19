@@ -197,6 +197,14 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
               .dropna(subset=['Package Size'])
               .drop_duplicates(subset=['NDC #']))
 
+    # ===== MFP columns (SDRA Amt > 0) =====
+    mfp_mask = log_df['SDRA Amt'] > 0
+    mfp_grp = (log_df[mfp_mask]
+               .groupby('NDC #', as_index=False)
+               .agg(MFP_Q_raw=('Qty Filled', 'sum'),
+                    MFP_D=('SDRA Amt', 'sum')))
+    mfp_grp['NDC #'] = mfp_grp['NDC #'].astype(str).str.zfill(11)
+
     # ===== 3) Pivots to Processor_Q and Processor_T =====
     # We already built grp_proc above with both Qty Filled and Winning_Paid.
     # >>> CHANGED: do NOT overwrite grp_proc again; keep both measures in it.
@@ -226,6 +234,7 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
               # Package Size, Drug Name
               .merge(pkg_df, on='NDC #', how='left')
               .merge(vendor_price_pivot, on='NDC #', how='left')
+              .merge(mfp_grp, on='NDC #', how='left')
               .merge(kinray_latest, on='NDC #', how='left'))   # Kinray_UPrice
 
     # Ensure vendor qty cols exist & numeric
@@ -252,6 +261,14 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         'Kinray_UPrice', 0), errors='coerce').fillna(0)
     pkg = pd.to_numeric(merged.get('Package Size', 0),
                         errors='coerce').fillna(0)
+    merged['MFP_Q_raw'] = pd.to_numeric(merged.get('MFP_Q_raw', 0), errors='coerce').fillna(0)
+    merged['MFP_D']     = pd.to_numeric(merged.get('MFP_D', 0), errors='coerce').fillna(0)
+    merged['MFP_Q']     = merged['MFP_Q_raw']
+    merged['MFP_P']     = (merged['MFP_Q_raw'] / pkg).where(pkg > 0, 0)
+    merged['MFP_T']     = 0
+    merged['MFP_Pur']   = 0
+    merged['MFP_Net']   = 0
+    merged.drop(columns=['MFP_Q_raw'], inplace=True)
 
     # ===== Bring in ALL PBM (Quantity & Total $) =====
     if all_pbm_path:
@@ -351,16 +368,17 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
             sorted([p for p in processors if p != 'ALL_PBM'])
     else:
         processors = sorted(processors)
+    processors = [p for p in processors if p != 'MFP']
 
     base_cols = ['NDC #', 'Drug Name', 'Package Size']
     vendor_qty_cols = vendor_names
-    qty_band = have([f'{pr}_Q' for pr in processors])
-    pkg_band = have([f'{pr}_P' for pr in processors])
-    diff_band = have([f'{pr}_D' for pr in processors])
-    paid_band = have([f'{pr}_T' for pr in processors])  # dollars paid
+    qty_band = have([f'{pr}_Q' for pr in processors] + ['MFP_Q'])
+    pkg_band = have([f'{pr}_P' for pr in processors] + ['MFP_P'])
+    diff_band = have([f'{pr}_D' for pr in processors] + ['MFP_D'])
+    paid_band = have([f'{pr}_T' for pr in processors] + ['MFP_T'])  # dollars paid
     # $$ purchased (Kinray)
-    pur_band = have([f'{pr}_Pur' for pr in processors])
-    net_band = have([f'{pr}_Net' for pr in processors])  # paid − purchased
+    pur_band = have([f'{pr}_Pur' for pr in processors] + ['MFP_Pur'])
+    net_band = have([f'{pr}_Net' for pr in processors] + ['MFP_Net'])  # paid - purchased
     other_cols = have(['Total Purchased', 'Kinray_UPrice'])
 
     # ✅ Round off paid_band, pur_band, and net_band columns (no decimals)
@@ -389,6 +407,7 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         # normalize to a set for membership and add forced include
         selected_upper = {p.strip().upper() for p in selected_processors}
         selected_upper.add('ALL_PBM')
+        selected_upper.add('MFP')
 
         keep_cols = []
         for col in desired_columns:
@@ -427,6 +446,51 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         processors = sorted(processors)
 
     # Build NDC → Drug Type map from Kinray
+    def _normalize_ndc_series(series):
+        return (series.astype(str)
+                .str.replace(r'\D', '', regex=True)
+                .str.lstrip('0'))
+
+    def _normalize_ndc_value(value):
+        return re.sub(r'\D', '', str(value)).lstrip('0')
+
+    def _drug_type_for_ndc(value):
+        return kinray_type_map.get(_normalize_ndc_value(value), 'Unclassified')
+
+    def _apply_drug_type_column(df):
+        if 'NDC #' not in df.columns:
+            return df
+        out = df.copy()
+        out['Drug Type'] = _normalize_ndc_series(
+            out['NDC #']).map(kinray_type_map).fillna('Unclassified')
+        return out
+
+    def _apply_drug_type_to_sheet(wb, sheet_name):
+        if sheet_name not in wb.sheetnames:
+            return
+        ws = wb[sheet_name]
+        header_row = 2
+        headers = [ws.cell(row=header_row, column=col).value
+                   for col in range(1, ws.max_column + 1)]
+        if 'NDC #' not in headers:
+            return
+
+        ndc_col = headers.index('NDC #') + 1
+        if 'Drug Type' in headers:
+            type_col = headers.index('Drug Type') + 1
+        else:
+            type_col = ws.max_column + 1
+            ws.cell(row=header_row, column=type_col, value='Drug Type')
+
+        for row_idx in range(header_row + 1, ws.max_row + 1):
+            ndc = ws.cell(row=row_idx, column=ndc_col).value
+            if ndc is None or str(ndc).strip() == '':
+                continue
+            ws.cell(row=row_idx, column=type_col,
+                    value=_drug_type_for_ndc(ndc))
+
+        ws.column_dimensions[get_column_letter(type_col)].width = 16
+
     kinray_type_map = {}
     try:
         kinray_kpath = [path for path in vendor_paths if 'kinray' in path.lower()][0]
@@ -437,28 +501,13 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
             (kdf['Invoice Number'].astype(str).str.strip().ne('nan')) &
             (kdf['Invoice Number'].astype(str).str.strip().ne('Invoice Number'))
         ].copy()
-        kdf['NDC_norm'] = (
-            kdf['NDC/UPC'].astype(str)
-            .str.replace(r'\D', '', regex=True)
-            .str.lstrip('0')
-        )
+        kdf['NDC_norm'] = _normalize_ndc_series(kdf['NDC/UPC'])
         kinray_type_map = dict(zip(kdf['NDC_norm'], kdf['Type']))
     except Exception as e:
         print(f'[DEBUG] Drug type map error: {e}')
 
-    # Add Drug Type to final
-    if 'NDC #' in final.columns:
-        final['NDC_norm'] = (
-            final['NDC #'].astype(str)
-            .str.replace(r'\D', '', regex=True)
-            .str.lstrip('0')
-        )
-        final['Drug Type'] = (
-            final['NDC_norm']
-            .map(kinray_type_map)
-            .fillna('Unclassified')
-        )
-        final = final.drop(columns=['NDC_norm'])
+    # Add Drug Type to final so generated sheets share the same source mapping.
+    final = _apply_drug_type_column(final)
 
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     # NEW: Split out rows that have NaN anywhere in the final report
@@ -499,7 +548,8 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         'PROCESSED_FOLDER', 'processed'))
     os.makedirs(output_dir, exist_ok=True)
     output_file = os.path.join(output_dir, safe_name)
-    final.to_excel(output_file,  index=False, float_format="%.3f")
+    final_excel = final.drop(columns=['Drug Type'], errors='ignore')
+    final_excel.to_excel(output_file, index=False, float_format="%.3f")
 
     #print(f"Processed file saved at: {output_file}")  # Debugging line
 
@@ -541,7 +591,8 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         #add_missed_refill_revenue_sheet(
             #wb, log_df=rx_compare_source, sheet_name="Missed Refill - Revenue Recovery", grace_days=7)
         add_summary_sheet(wb, processed_source="Processed Data", needs_title="Needs to be ordered - All",
-                          header_row=3, data_start_row=4, pharmacy_name=pharmacy_name, date_range=date_range)
+                          header_row=3, data_start_row=4, pharmacy_name=pharmacy_name,
+                          date_range=date_range, final_data=final)
         #add_alternate_ndc_sheet(wb, custom_log_df, all_vendor_df)
         # ALT_SHEET_NAME = "Alternate NDC - Purchased"
         # add_alternate_ndc_sheet(wb, log_df, all_vendor_df, sheet_name=ALT_SHEET_NAME)

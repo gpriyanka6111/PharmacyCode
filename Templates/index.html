@@ -236,7 +236,65 @@
     <div class="row justify-content-center">
       <div class="col-xl-10">
 
+        <!-- Choice: Last Report vs New Report -->
+        {% if past_reports %}
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <div class="past-report-card d-flex flex-column" style="border-color:var(--brand);min-height:160px;">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-bar-chart-fill" style="color:var(--brand);font-size:1.2rem;"></i>
+                <span style="font-weight:600;font-size:0.95rem;">Last Report</span>
+                <span class="badge ms-1" style="background:var(--brand);color:#fff;font-size:0.65rem;padding:3px 8px;">Latest</span>
+              </div>
+              <div style="font-size:0.85rem;font-weight:500;color:var(--ink);margin-bottom:2px;">{{ past_reports[0].pharmacy_name or 'Pharmacy' }}</div>
+              <div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px;">{{ past_reports[0].generated_at[:10] if past_reports[0].generated_at else '' }}</div>
+              {% if past_reports[0].csv_backup_path %}<small class="text-success" style="font-size:0.72rem;margin-bottom:auto;">&#128190; CSVs backed up</small>{% else %}<small class="text-muted" style="font-size:0.72rem;margin-bottom:auto;">No CSV backup</small>{% endif %}
+              <a href="/load_report/{{ past_reports[0].filename }}" class="btn btn-primary btn-sm mt-3" style="background:var(--brand);border-color:var(--brand);">
+                <i class="bi bi-speedometer2 me-1"></i>View Dashboard
+              </a>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="past-report-card d-flex flex-column" style="min-height:160px;">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-plus-circle-fill" style="color:var(--accent);font-size:1.2rem;"></i>
+                <span style="font-weight:600;font-size:0.95rem;">New Report</span>
+              </div>
+              <div style="font-size:0.85rem;color:var(--muted);margin-bottom:auto;">Upload fresh CSV files to run a new analysis.</div>
+              <button class="btn btn-outline-primary btn-sm mt-3" onclick="document.getElementById('upload-section').scrollIntoView({behavior:'smooth'})">
+                <i class="bi bi-upload me-1"></i>Start Upload ↓
+              </button>
+            </div>
+          </div>
+        </div>
+        {% if past_reports|length > 1 %}
+        <div class="mb-4">
+          <h6 style="font-weight:600;color:var(--muted);font-size:0.82rem;letter-spacing:.04em;margin-bottom:10px;">OLDER REPORTS</h6>
+          <div class="row g-2">
+            {% for r in past_reports[1:] %}
+            <div class="col-md-6 col-lg-4">
+              <div class="past-report-card d-flex align-items-center justify-content-between" style="padding:10px 14px;">
+                <div>
+                  <div style="font-size:0.83rem;font-weight:600;color:var(--ink);">{{ r.pharmacy_name or 'Report' }}</div>
+                  <div style="font-size:0.7rem;color:var(--muted);">{{ r.generated_at[:10] if r.generated_at else '' }}</div>
+                  {% if r.csv_backup_path %}<small class="text-success" style="font-size:0.68rem;">&#128190; CSVs backed up</small>{% else %}<small class="text-muted" style="font-size:0.68rem;">No CSV backup</small>{% endif %}
+                </div>
+                <a href="/load_report/{{ r.filename }}" class="btn btn-sm btn-outline-primary" style="font-size:0.78rem;">Load</a>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="text-center py-4 mb-4" style="background:#fff;border:1px solid var(--border);border-radius:12px;">
+          <i class="bi bi-hand-wave fs-1 d-block mb-2" style="color:var(--brand);"></i>
+          <p style="color:var(--muted);margin-bottom:0;">Welcome to PharmaTrack. Upload your CSV files below to generate your first report.</p>
+        </div>
+        {% endif %}
+
         <!-- STEP 1: Upload -->
+        <div id="upload-section"></div>
         <section id="step1" class="step-card card p-4 mb-4">
           <div class="d-flex align-items-center mb-3">
             <span class="badge-step brand-gradient me-3"><i class="bi bi-1-circle"></i></span>
@@ -278,7 +336,7 @@
               </div>
 
               <div class="col-md-6">
-                <label class="form-label">BestRx — Custom Log (CSV)</label>
+                <label class="form-label">BestRx — Custom Log (CSV) — File #1</label>
                 <div class="uploader">
                   <label class="dropzone w-100" data-for="custom_log">
                     <i class="bi bi-filetype-csv dz-icon"></i>
@@ -292,7 +350,7 @@
               </div>
 
               <div class="col-md-6">
-                <label class="form-label">BestRx — ALL PBM (CSV)</label>
+                <label class="form-label">BestRx — ALL PBM (CSV) — File #2</label>
                 <div class="uploader">
                   <label class="dropzone w-100" data-for="all_pbm">
                     <i class="bi bi-file-earmark-spreadsheet dz-icon"></i>
@@ -306,7 +364,7 @@
               </div>
 
               <div class="col-md-6">
-                <label class="form-label">BIN Master (CSV)</label>
+                <label class="form-label">BIN Master (CSV) — File #3</label>
                 <div class="uploader">
                   <label class="dropzone w-100" data-for="bin_master">
                     <i class="bi bi-clipboard-data dz-icon"></i>
@@ -320,8 +378,7 @@
               </div>
 
               <div class="col-md-6">
-                <label class="form-label">KINRAY (CSV) -> date, ndc, shipped, invoice </label>
-                <div class="uploader">
+                  <label class="form-label">KINRAY (CSV) → DATE, NDC, SHIPPED QTY, INVOICE $, TYPE — File #4</label>                <div class="uploader">
                   <label class="dropzone w-100" data-for="kinray_file">
                     <i class="bi bi-filetype-csv dz-icon"></i>
                     <span class="dz-text">Drag & drop or click to upload</span>
@@ -334,7 +391,7 @@
               </div>
 
               <div class="col-md-6">
-                <label class="form-label">Additional Vendors (excluding Kinray) -> ndc, shipped, invoice</label>
+                <label class="form-label">Additional Vendors (excluding Kinray) → NDC, SHIPPED QTY, INVOICE $ — File #5+</label>
                 <div class="input-group">
                   <span class="input-group-text"><i class="bi bi-people"></i></span>
                   <input type="number" id="vendor_count" name="vendor_count" class="form-control" min="0" value="0">
@@ -488,36 +545,6 @@
           <p>Have a wonderful day!</p>
         </section>
 
-        {% if past_reports %}
-        <section id="past-reports" class="mt-5">
-          <h5 class="mb-3" style="font-weight:600;color:var(--ink);">
-            <i class="bi bi-clock-history me-2" style="color:var(--brand)"></i>Past Reports
-          </h5>
-          <div class="row g-3">
-            {% for r in past_reports %}
-            <div class="col-md-6 col-lg-4">
-              <a href="/load_report/{{ r.filename }}" class="text-decoration-none">
-                <div class="past-report-card">
-                  <div style="font-weight:600;font-size:0.95rem;color:var(--ink);margin-bottom:4px;">
-                    {{ r.pharmacy_name or 'Report' }}
-                  </div>
-                  <div style="font-size:0.8rem;color:var(--muted);margin-bottom:10px;">
-                    {{ r.date_range or '' }}
-                  </div>
-                  <div style="display:flex;gap:16px;font-size:0.83rem;color:var(--ink);">
-                    <span><strong>{{ r.total_rx }}</strong> Rx</span>
-                    <span><strong>${{ r.all_pbm_total | int }}</strong> PBM</span>
-                  </div>
-                  <div style="font-size:0.72rem;color:var(--muted);margin-top:8px;">
-                    {{ r.generated_at[:10] if r.generated_at else '' }}
-                  </div>
-                </div>
-              </a>
-            </div>
-            {% endfor %}
-          </div>
-        </section>
-        {% endif %}
 
         </div>
         </div>

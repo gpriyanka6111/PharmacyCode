@@ -242,10 +242,11 @@
       z-index: 2;
       background: #fff;
     }
-    .col-freeze-0 { left: 0; }
-    .col-freeze-1 { left: 105px; }
+    .col-freeze-row-num { left: 0; width: 40px; min-width: 40px; max-width: 40px; }
+    .col-freeze-0 { left: 40px; }
+    .col-freeze-1 { left: 145px; }
     .col-freeze-2 {
-      left: 345px;
+      left: 385px;
       border-right: 2px solid var(--border) !important;
     }
     thead .col-freeze { background: var(--bg); }
@@ -310,8 +311,8 @@
       </div>
       {% endif %}
     </div>
-    <button class="export-btn" onclick="exportCSV()" style="background:{{ sheet_export_bg }};">
-      <i class="bi bi-download"></i> Export CSV
+    <button class="export-btn" onclick="exportExcel()" style="background:{{ sheet_export_bg }};">
+      <i class="bi bi-download"></i> ⬇ Export Excel
     </button>
   </div>
 </div>
@@ -359,13 +360,7 @@
   <!-- ── Controls ── -->
   <div class="controls-bar mb-4">
     <div class="d-flex flex-wrap align-items-center gap-2">
-      <input class="search-input" id="search-box" placeholder="Search drug name or NDC..." oninput="applyFilters()" />
-      <div class="d-flex gap-1 ms-1" style="border-left:1px solid var(--border);padding-left:10px;">
-        <span style="font-size:0.8rem;color:var(--muted);align-self:center;margin-right:2px;">Show:</span>
-        <button class="filter-btn active" id="btn-all"   onclick="setLimit('all')">All</button>
-        <button class="filter-btn"        id="btn-top20" onclick="setLimit(20)">Top 20</button>
-        <button class="filter-btn"        id="btn-top50" onclick="setLimit(50)">Top 50</button>
-      </div>
+      <input class="search-input" id="search-box" placeholder="Search drug name or NDC..." oninput="onSearchInput()" />
       <div class="d-flex gap-1 ms-1" style="border-left:1px solid var(--border);padding-left:10px;">
         <span style="font-size:0.8rem;color:var(--muted);align-self:center;margin-right:2px;">Severity:</span>
         <button class="filter-btn sev-high" id="btn-high" onclick="toggleSev('high')">{{ high_label }}</button>
@@ -413,12 +408,9 @@
           {{ 'drug' if sheet_count == 1 else 'drugs' }}
         </span>
         <div style="display:flex;gap:8px;align-items:center;">
-          <span id="load-spinner" style="display:none;font-size:0.78rem;color:var(--muted);">Loading…</span>
-          <button id="load-more-btn"
-                  onclick="loadMoreRows()"
-                  style="display:{% if sheet_count > 100 %}block{% else %}none{% endif %};background:#fff;border:1px solid var(--border);border-radius:6px;padding:5px 14px;font-size:0.78rem;cursor:pointer;color:var(--ink);font-family:inherit;">
-            Load more
-          </button>
+          <span id="load-spinner" style="display:none;font-size:0.78rem;color:var(--muted);">
+            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading…
+          </span>
         </div>
       </div>
     </div>
@@ -427,309 +419,308 @@
 </div>
 
 <script>
-  const COLUMNS = {{ columns | tojson }};
-  const ALL_ROWS = {{ rows | tojson }};
+  const COLUMNS    = {{ columns | tojson }};
   const STAT_LABELS = {{ stat_labels | tojson }};
-  const DRUG_TYPES = {{ drug_types | tojson }};
-
-  // Pagination state
-  let currentPage = 1;
-  let isLoading = false;
-  let hasMore = {{ 'true' if sheet_count > 100 else 'false' }};
-  const SHEET_KEY = {{ sheet_key | tojson }};
-  const JOB_ID = {{ job_id | tojson }};
-  const TOTAL_COUNT = {{ sheet_count }};
-
-  // Find severity column index using the server-provided column name
+  const DRUG_TYPES  = {{ drug_types | tojson }};
+  const SHEET_KEY   = {{ sheet_key | tojson }};
+  const JOB_ID      = {{ job_id | tojson }};
   const SEVERITY_COL = {{ severity_col | tojson }};
-  const DNO_COL = COLUMNS.findIndex(c =>
-    c === SEVERITY_COL ||
-    c.toLowerCase() === SEVERITY_COL.toLowerCase()
-  );
+  let ALL_ROWS      = [];
 
-  // Find drug name and NDC columns
+  const DNO_COL  = COLUMNS.findIndex(c => c === SEVERITY_COL || c.toLowerCase() === SEVERITY_COL.toLowerCase());
   const NAME_COL = COLUMNS.findIndex(c => c.toLowerCase().includes('drug') && c.toLowerCase().includes('name'));
   const NDC_COL  = COLUMNS.findIndex(c => c.toLowerCase().includes('ndc'));
 
-  const DRUG_TYPE_COL = COLUMNS.indexOf('Drug Type');
-  let activeTypeFilter = 'all';
-
   const PROC_COLS = COLUMNS.reduce((acc, col, i) => {
-    if ((col.endsWith('_D') || col.endsWith('_d')) && col !== 'ALL_PBM_D') {
-      acc.push({ name: col.replace(/_D$/i, ''), idx: i, col: col });
-    }
+    if ((col.endsWith('_D') || col.endsWith('_d')) && col !== 'ALL_PBM_D')
+      acc.push({ name: col.replace(/_D$/i, ''), idx: i, col });
     return acc;
   }, []);
-  let activeProcs = new Set(PROC_COLS.map(p => p.col));
 
-  let currentLimit = 'all';
-  let activeSev = null;   // 'high' | 'med' | 'low' | null
-  let sortCol = DNO_COL >= 0 ? DNO_COL : -1;
-  let sortDir = 'desc';
+  let activeProcs     = new Set(PROC_COLS.map(p => p.col));
+  let activeSev       = null;
+  let activeTypeFilter = 'all';
+  let sortCol         = DNO_COL >= 0 ? DNO_COL : -1;
+  let sortDir         = 'desc';
+  let isLoading       = false;
+  let searchDebounce  = null;
+  let currentSearch   = '';
 
-  function getDNOVal(row) {
-    if (DNO_COL < 0) return 0;
-    return parseFloat(String(row[DNO_COL]).replace(',','')) || 0;
-  }
-
-  function getSeverity(val, col) {
-    // For negative-value columns (e.g. Rx Comparison Difference),
-    // use absolute value so more-negative = more severe
-    const severityCol = {{ severity_col | tojson }};
-    const checkVal = (col === severityCol && val < 0) ? Math.abs(val) : val;
-    if (checkVal > 10) return 'high';
-    if (checkVal >= 5)  return 'med';
-    return 'low';
-  }
-
-  // Column width map — first 3 frozen, processor cols compact
   const COL_WIDTHS = { 0: '105px', 1: '240px', 2: '60px' };
   const PROC_COL_W = '58px';
 
-  function isProcessorCol(colName) {
-    // Processor columns end in _D or match known processor names
-    return colName.endsWith('_D') || colName.endsWith('_d');
+  function isProcessorCol(c) { return c.endsWith('_D') || c.endsWith('_d'); }
+
+  const HIDDEN_COLS = new Set(['Insurance-wise Order Estimate ($)', 'Amount', 'Drug Type']);
+  const DRUG_TYPE_COL = COLUMNS.findIndex(c => c === 'Drug Type');
+  function isHiddenCol(c) {
+    if (!c) return false;
+    return HIDDEN_COLS.has(c) || c.toLowerCase().includes('insurance-wise');
   }
 
-  const HIDDEN_COLS = new Set([
-    'Insurance-wise Order Estimate ($)',
-    'Amount',
-    'Drug Type',
-  ]);
-  function isHiddenCol(colName) {
-    if (!colName) return false;
-    if (HIDDEN_COLS.has(colName)) return true;
-    if (colName.toLowerCase().includes('insurance-wise')) return true;
-    return false;
+  function parseCellNumber(cell) {
+    return parseFloat(String(cell).replace(/,/g, '')) || 0;
   }
 
+  function formatCellNumber(val) {
+    return Number.isInteger(val) ? String(val) : String(Math.round(val * 100) / 100);
+  }
+
+  function getDNOVal(row) {
+    return DNO_COL >= 0 ? parseCellNumber(row[DNO_COL]) : 0;
+  }
+
+  function getActiveDNOVal(row) {
+    if (DNO_COL < 0 || !PROC_COLS.length) return getDNOVal(row);
+    const activeValues = PROC_COLS
+      .filter(proc => activeProcs.has(proc.col))
+      .map(proc => parseCellNumber(row[proc.idx]));
+    if (!activeValues.length) return getDNOVal(row);
+
+    if (SHEET_KEY === 'needs_ordering') {
+      const minValue = Math.min(...activeValues);
+      return minValue < 0 ? Math.abs(minValue) : 0;
+    }
+
+    if (SHEET_KEY === 'do_not_order') {
+      return Math.min(...activeValues);
+    }
+
+    return getDNOVal(row);
+  }
+
+  function getDisplayRow(row) {
+    const displayRow = row.slice();
+    if (DNO_COL >= 0 && PROC_COLS.length) displayRow[DNO_COL] = formatCellNumber(getActiveDNOVal(row));
+    return displayRow;
+  }
+
+  function getSeverity(val) {
+    if (!STAT_LABELS) return 'low';
+    const v = Math.abs(val);
+    if (v > STAT_LABELS.high_min) return 'high';
+    if (v >= STAT_LABELS.med_min && v <= STAT_LABELS.med_max) return 'med';
+    return 'low';
+  }
+
+  // ── Header ──────────────────────────────────────────────────────────────
   function buildHeader() {
     const tr = document.createElement('tr');
+
+    const thNum = document.createElement('th');
+    thNum.textContent = '#';
+    thNum.classList.add('col-freeze', 'col-freeze-row-num');
+    thNum.style.textAlign = 'center';
+    tr.appendChild(thNum);
+
     COLUMNS.forEach((col, i) => {
       if (isHiddenCol(col)) return;
-      const isHiddenProc = (col.endsWith('_D') || col.endsWith('_d')) &&
-        col !== 'ALL_PBM_D' && !activeProcs.has(col);
-      if (isHiddenProc) return;
+      if ((col.endsWith('_D') || col.endsWith('_d')) && col !== 'ALL_PBM_D' && !activeProcs.has(col)) return;
 
       const th = document.createElement('th');
-      const isFreeze = i < 3;
       const isProc = isProcessorCol(col);
-
-      // Display name — strip _D suffix for processor cols
-      const displayName = isProc
-        ? col.replace(/_D$/i, '').replace(/_d$/i, '')
-        : col;
-
+      const displayName = isProc ? col.replace(/_D$/i, '').replace(/_d$/i, '') : col;
       th.innerHTML = displayName + '<span class="sort-icon"></span>';
 
-      // Freeze first 3
-      if (isFreeze) {
-        th.classList.add('col-freeze', `col-freeze-${i}`);
-      }
+      if (i < 3) th.classList.add('col-freeze', `col-freeze-${i}`);
 
-      // Processor col: compact + wrap
       if (isProc) {
-        th.style.width = PROC_COL_W;
-        th.style.minWidth = PROC_COL_W;
-        th.style.maxWidth = PROC_COL_W;
-        th.style.whiteSpace = 'normal';
-        th.style.wordBreak = 'break-word';
-        th.style.textAlign = 'center';
-        th.style.lineHeight = '1.3';
-        th.style.padding = '6px 4px';
+        th.style.cssText = `width:${PROC_COL_W};min-width:${PROC_COL_W};max-width:${PROC_COL_W};white-space:normal;word-break:break-word;text-align:center;line-height:1.3;padding:6px 4px;`;
       } else if (COL_WIDTHS[i]) {
-        th.style.width = COL_WIDTHS[i];
-        th.style.minWidth = COL_WIDTHS[i];
-        th.style.maxWidth = COL_WIDTHS[i];
+        th.style.width = th.style.minWidth = th.style.maxWidth = COL_WIDTHS[i];
+        th.style.textAlign = 'center';
+      } else {
+        th.style.textAlign = 'center';
       }
-      // Explicit center alignment for all header cells (matches td alignment below)
-      if (!isProc) th.style.textAlign = 'center';
 
       if (i === sortCol) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
       th.onclick = () => doSort(i);
       tr.appendChild(th);
     });
+
     document.getElementById('table-head').innerHTML = '';
     document.getElementById('table-head').appendChild(tr);
   }
 
   function doSort(colIdx) {
-    if (sortCol === colIdx) {
-      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-    } else {
-      sortCol = colIdx;
-      sortDir = 'desc';
-    }
+    sortDir = sortCol === colIdx ? (sortDir === 'asc' ? 'desc' : 'asc') : 'desc';
+    sortCol = colIdx;
     buildHeader();
     applyFilters();
   }
 
-  function applyFilters() {
-    const q = document.getElementById('search-box').value.toLowerCase();
-
-    let rows = ALL_ROWS.filter(row => {
-      // Search
-      if (q) {
-        const nameMatch = NAME_COL >= 0 && String(row[NAME_COL]).toLowerCase().includes(q);
-        const ndcMatch  = NDC_COL  >= 0 && String(row[NDC_COL]).toLowerCase().includes(q);
-        const anyMatch  = row.some(cell => String(cell).toLowerCase().includes(q));
-        if (!nameMatch && !ndcMatch && !anyMatch) return false;
-      }
-      // Severity filter
-      if (activeSev) {
-        const sev = getSeverity(getDNOVal(row));
-        if (sev !== activeSev) return false;
-      }
-      // Drug Type filter
-      if (activeTypeFilter !== 'all' && DRUG_TYPE_COL >= 0) {
-        const rowType = String(row[DRUG_TYPE_COL] || '').trim();
-        if (activeTypeFilter === 'Unclassified') {
-          // Unclassified button → show ONLY Unclassified
-          if (rowType !== 'Unclassified') return false;
-        } else {
-          // Branded/Generic/OTC → show that type + Unclassified
-          if (rowType !== activeTypeFilter && rowType !== 'Unclassified') return false;
-        }
-      }
-      return true;
-    });
-
-    // Sort
-    if (sortCol >= 0) {
-      rows.sort((a, b) => {
-        const av = parseFloat(String(a[sortCol]).replace(',','')) || String(a[sortCol]);
-        const bv = parseFloat(String(b[sortCol]).replace(',','')) || String(b[sortCol]);
-        if (av < bv) return sortDir === 'asc' ? -1 :  1;
-        if (av > bv) return sortDir === 'asc' ?  1 : -1;
-        return 0;
-      });
-    }
-
-    // Limit
-    const total = rows.length;
-    if (currentLimit !== 'all') rows = rows.slice(0, currentLimit);
-
-    renderRows(rows, total);
-  }
-
-  function renderRows(rows, total) {
+  // ── Row rendering ────────────────────────────────────────────────────────
+  function renderRows(rowObjs) {
     const tbody = document.getElementById('table-body');
     tbody.innerHTML = '';
-    rows.forEach(row => {
-      const dnoVal = getDNOVal(row);
-      const sev = getSeverity(dnoVal, {{ severity_col | tojson }});
+    rowObjs.forEach(({ row_number, data }) => {
+      const row = getDisplayRow(data);
+      const sev = getSeverity(getDNOVal(row));
       const tr = document.createElement('tr');
       tr.className = sev === 'high' ? 'row-high' : sev === 'med' ? 'row-medium' : 'row-low';
+
+      // Row number cell
+      const tdNum = document.createElement('td');
+      tdNum.textContent = row_number;
+      tdNum.classList.add('col-freeze', 'col-freeze-row-num');
+      tdNum.style.cssText = 'text-align:center;color:var(--muted);font-size:0.75rem;';
+      tr.appendChild(tdNum);
+
       row.forEach((cell, i) => {
         const col = COLUMNS[i] || '';
         if (isHiddenCol(col)) return;
-        const isHiddenProc = (col.endsWith('_D') || col.endsWith('_d')) &&
-          col !== 'ALL_PBM_D' && !activeProcs.has(col);
-        if (isHiddenProc) return;
+        if ((col.endsWith('_D') || col.endsWith('_d')) && col !== 'ALL_PBM_D' && !activeProcs.has(col)) return;
 
         const td = document.createElement('td');
-        const isFreeze = i < 3;
         const isProc = isProcessorCol(col);
-        const numVal = parseFloat(String(cell).replace(',',''));
+        const numVal = parseFloat(String(cell).replace(',', ''));
         const isZero = !isNaN(numVal) && numVal === 0;
-        const isNegative = !isNaN(numVal) && numVal < 0;
+        const isNeg  = !isNaN(numVal) && numVal < 0;
 
-        // Freeze first 3 cols
-        if (isFreeze) {
-          td.classList.add('col-freeze', `col-freeze-${i}`);
-        }
+        if (i < 3) td.classList.add('col-freeze', `col-freeze-${i}`);
 
-        // Cell content + styling
         if (i === DNO_COL) {
           td.innerHTML = `<span class="dno-val">${cell}</span>`;
           td.style.textAlign = 'center';
-        } else if (isNegative) {
-          td.style.background = '#FFF0F0';
-          td.style.color = '#CC0000';
-          td.style.fontWeight = '600';
-          td.style.textAlign = 'center';
+        } else if (isNeg) {
+          td.style.cssText = 'background:#FFF0F0;color:#CC0000;font-weight:600;text-align:center;';
           td.textContent = cell;
         } else if (isProc) {
-          td.style.textAlign = 'center';
-          td.style.padding = '8px 4px';
-          td.style.fontSize = isZero ? '0.72rem' : '0.82rem';
-          if (isZero) {
-            td.classList.add('proc-cell-zero');
-          } else {
-            td.classList.add('proc-cell-val');
-          }
+          td.style.cssText = `text-align:center;padding:8px 4px;font-size:${isZero ? '0.72rem' : '0.82rem'};`;
+          td.classList.add(isZero ? 'proc-cell-zero' : 'proc-cell-val');
           td.textContent = cell;
         } else {
           td.textContent = cell;
-          // Center all non-text columns; keep Drug Name left-aligned
           if (i !== NAME_COL) td.style.textAlign = 'center';
         }
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
     });
-    document.getElementById('showing-count').textContent = rows.length;
   }
 
-  function setLimit(val) {
-    currentLimit = val;
-    document.querySelectorAll('#btn-all,#btn-top20,#btn-top50').forEach(b => b.classList.remove('active'));
-    const map = { all: 'btn-all', 20: 'btn-top20', 50: 'btn-top50' };
-    document.getElementById(map[val])?.classList.add('active');
-    applyFilters();
+  // ── Data load + client filters ───────────────────────────────────────────
+  function setLoading(loading) {
+    isLoading = loading;
+    document.getElementById('load-spinner').style.display = loading ? 'inline-flex' : 'none';
   }
 
+  async function loadAllRows() {
+    if (isLoading) return;
+    setLoading(true);
+
+    try {
+      let page = 1;
+      let hasMore = true;
+      let rows = [];
+      let expectedTotal = null;
+
+      while (hasMore) {
+        const params = new URLSearchParams({
+          job_id: JOB_ID,
+          sheet: SHEET_KEY,
+          page,
+          per_page: 99999
+        });
+        const res  = await fetch(`/api/sheet_data?${params}`);
+        const data = await res.json();
+        if (!data.ok) return;
+
+        rows = rows.concat(data.rows || []);
+        expectedTotal = data.total_count ?? expectedTotal;
+        hasMore = Boolean(data.has_more) && rows.length < (expectedTotal || Infinity);
+        page++;
+      }
+
+      ALL_ROWS = rows;
+      document.getElementById('total-count').textContent = ALL_ROWS.length;
+      document.getElementById('total-badge').textContent = ALL_ROWS.length + ' drugs';
+      const statTotal = document.getElementById('stat-total');
+      if (statTotal) statTotal.textContent = ALL_ROWS.length;
+      computeStats();
+      applyFilters();
+    } catch (e) {
+      console.error('Fetch error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function applyFilters() {
+    const search = currentSearch.toLowerCase();
+    let filteredRows = ALL_ROWS.slice();
+
+    if (search) {
+      filteredRows = filteredRows.filter(({ data: row }) => {
+        const drugName = NAME_COL >= 0 ? String(row[NAME_COL] || '').toLowerCase() : '';
+        const ndc = NDC_COL >= 0 ? String(row[NDC_COL] || '').toLowerCase() : '';
+        return drugName.includes(search) || ndc.includes(search);
+      });
+    }
+
+    if (activeSev) {
+      filteredRows = filteredRows.filter(({ data: row }) => getSeverity(getActiveDNOVal(row)) === activeSev);
+    }
+
+    if (activeTypeFilter !== 'all' && DRUG_TYPE_COL >= 0) {
+      filteredRows = filteredRows.filter(({ data: row }) => String(row[DRUG_TYPE_COL] || '') === activeTypeFilter);
+    }
+
+    if (sortCol >= 0) {
+      filteredRows.sort((a, b) => {
+        const aVal = sortCol === DNO_COL ? getActiveDNOVal(a.data) : a.data[sortCol];
+        const bVal = sortCol === DNO_COL ? getActiveDNOVal(b.data) : b.data[sortCol];
+        const aRaw = String(aVal || '').trim();
+        const bRaw = String(bVal || '').trim();
+        const bothNumeric = aRaw !== '' && bRaw !== '' && !isNaN(parseFloat(aRaw)) && !isNaN(parseFloat(bRaw));
+        const cmp = bothNumeric
+          ? parseCellNumber(aVal) - parseCellNumber(bVal)
+          : aRaw.localeCompare(bRaw, undefined, { numeric: true, sensitivity: 'base' });
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    const renumbered = filteredRows.map((rowObj, idx) => ({ ...rowObj, row_number: idx + 1 }));
+    renderRows(renumbered);
+    document.getElementById('showing-count').textContent = renumbered.length;
+    document.getElementById('total-count').textContent = ALL_ROWS.length;
+  }
+
+  function onSearchInput() {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => {
+      currentSearch = document.getElementById('search-box').value.trim();
+      applyFilters();
+    }, 300);
+  }
+
+  // ── Filter controls ──────────────────────────────────────────────────────
   function toggleSev(sev) {
     activeSev = activeSev === sev ? null : sev;
     document.querySelectorAll('.filter-btn.sev-high,.filter-btn.sev-med,.filter-btn.sev-low')
       .forEach(b => b.classList.remove('active'));
-    if (activeSev) {
-      const map = { high: 'btn-high', med: 'btn-med', low: 'btn-low' };
-      document.getElementById(map[activeSev])?.classList.add('active');
-    }
+    if (activeSev) document.getElementById({ high:'btn-high', med:'btn-med', low:'btn-low' }[activeSev])?.classList.add('active');
     applyFilters();
-  }
-
-  function computeStats() {
-    if (!STAT_LABELS) return;
-    const highMin = STAT_LABELS.high_min;
-    const medMin  = STAT_LABELS.med_min;
-    const medMax  = STAT_LABELS.med_max;
-    let high = 0, med = 0, low = 0;
-    ALL_ROWS.forEach(row => {
-      const v = Math.abs(getDNOVal(row));
-      if (v > highMin) high++;
-      else if (v >= medMin && v <= medMax) med++;
-      else low++;
-    });
-    document.getElementById('stat-high').textContent = high;
-    document.getElementById('stat-med').textContent  = med;
-    document.getElementById('stat-low').textContent  = low;
   }
 
   function setTypeFilter(type) {
     activeTypeFilter = type;
     document.querySelectorAll('[id^="btn-type-"]').forEach(b => b.classList.remove('active'));
-    if (type === 'all') {
-      document.getElementById('btn-type-all')?.classList.add('active');
-    } else {
-      document.querySelectorAll(`[data-dtype="${type}"]`).forEach(b => b.classList.add('active'));
-    }
+    if (type === 'all') document.getElementById('btn-type-all')?.classList.add('active');
+    else document.querySelectorAll(`[data-dtype="${type}"]`).forEach(b => b.classList.add('active'));
     applyFilters();
   }
 
+  // ── Processor pills ──────────────────────────────────────────────────────
   function buildProcPills() {
     const container = document.getElementById('proc-pills');
     if (!container || !PROC_COLS.length) return;
     container.innerHTML = PROC_COLS.map(p => `
-      <span id="pill-${p.name}"
-            onclick="toggleProc('${p.col}','${p.name}')"
-            style="display:inline-flex;align-items:center;gap:3px;padding:3px 10px;
-                   border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;
-                   background:#E6F1FB;color:#0C447C;border:1px solid #B5D4F4;
-                   user-select:none;transition:all 0.15s">
-        ${p.name}
-      </span>
+      <span id="pill-${p.name}" onclick="toggleProc('${p.col}','${p.name}')"
+        style="display:inline-flex;align-items:center;gap:3px;padding:3px 10px;
+               border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;
+               background:#E6F1FB;color:#0C447C;border:1px solid #B5D4F4;
+               user-select:none;transition:all 0.15s">${p.name}</span>
     `).join('');
   }
 
@@ -738,22 +729,10 @@
     if (activeProcs.has(colName)) {
       if (activeProcs.size <= 1) return;
       activeProcs.delete(colName);
-      if (pill) {
-        pill.style.background = 'var(--bg)';
-        pill.style.color = 'var(--muted)';
-        pill.style.borderColor = 'var(--border)';
-        pill.style.textDecoration = 'line-through';
-        pill.style.opacity = '0.6';
-      }
+      if (pill) { pill.style.background='var(--bg)';pill.style.color='var(--muted)';pill.style.borderColor='var(--border)';pill.style.textDecoration='line-through';pill.style.opacity='0.6'; }
     } else {
       activeProcs.add(colName);
-      if (pill) {
-        pill.style.background = '#E6F1FB';
-        pill.style.color = '#0C447C';
-        pill.style.borderColor = '#B5D4F4';
-        pill.style.textDecoration = 'none';
-        pill.style.opacity = '1';
-      }
+      if (pill) { pill.style.background='#E6F1FB';pill.style.color='#0C447C';pill.style.borderColor='#B5D4F4';pill.style.textDecoration='none';pill.style.opacity='1'; }
     }
     const hidden = PROC_COLS.filter(p => !activeProcs.has(p.col)).map(p => p.name);
     const note = document.getElementById('proc-note');
@@ -762,114 +741,39 @@
     applyFilters();
   }
 
-  function exportCSV() {
-    const q = document.getElementById('search-box').value.toLowerCase();
-    let rows = ALL_ROWS.filter(row => {
-      if (activeSev && getSeverity(getDNOVal(row)) !== activeSev) return false;
-      if (q) return row.some(c => String(c).toLowerCase().includes(q));
-      return true;
+  // ── Stat cards ───────────────────────────────────────────────────────────
+  function computeStats() {
+    if (!STAT_LABELS) return;
+    let high = 0, med = 0, low = 0;
+    ALL_ROWS.forEach(({ data: row }) => {
+      const v = Math.abs(getDNOVal(row));
+      if (v > STAT_LABELS.high_min) high++;
+      else if (v >= STAT_LABELS.med_min && v <= STAT_LABELS.med_max) med++;
+      else low++;
     });
-    const lines = [COLUMNS.join(',')];
-    rows.forEach(row => {
-      lines.push(row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','));
-    });
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = '{{ sheet_key }}.csv';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    document.getElementById('stat-high').textContent = high;
+    document.getElementById('stat-med').textContent  = med;
+    document.getElementById('stat-low').textContent  = low;
   }
 
-  async function loadMoreRows() {
-    if (isLoading || !hasMore) return;
-
-    isLoading = true;
-    document.getElementById('load-spinner').style.display = 'inline';
-    document.getElementById('load-more-btn').style.display = 'none';
-
-    try {
-      currentPage++;
-      const res = await fetch(
-        `/api/sheet_data?job_id=${JOB_ID}&sheet=${SHEET_KEY}&page=${currentPage}`
-      );
-      const data = await res.json();
-
-      if (data.ok && data.rows.length > 0) {
-        const tbody = document.getElementById('table-body');
-
-        data.rows.forEach(row => {
-          const dnoIdx = data.columns.findIndex(c =>
-            c === SEVERITY_COL || c.toLowerCase() === SEVERITY_COL.toLowerCase()
-          );
-          const rawVal = dnoIdx >= 0 ? (parseFloat(String(row[dnoIdx]).replace(',', '')) || 0) : 0;
-          const sev = getSeverity(rawVal, SEVERITY_COL);
-          const tr = document.createElement('tr');
-          tr.className = sev === 'high' ? 'row-high' : sev === 'med' ? 'row-medium' : 'row-low';
-          row.forEach((cell, i) => {
-            const col = data.columns[i] || '';
-            if (isHiddenCol(col)) return;
-            const isHiddenProc = (col.endsWith('_D') || col.endsWith('_d')) &&
-              col !== 'ALL_PBM_D' && !activeProcs.has(col);
-            if (isHiddenProc) return;
-
-            const td = document.createElement('td');
-            const isFreeze = i < 3;
-            const isProc = isProcessorCol(col);
-            const numVal = parseFloat(String(cell).replace(',',''));
-            const isZero = !isNaN(numVal) && numVal === 0;
-            const isNegative = !isNaN(numVal) && numVal < 0;
-            if (isFreeze) td.classList.add('col-freeze', `col-freeze-${i}`);
-            if (i === dnoIdx) {
-              td.innerHTML = `<span class="dno-val">${cell}</span>`;
-              td.style.textAlign = 'center';
-            } else if (isNegative) {
-              td.style.background = '#FFF0F0';
-              td.style.color = '#CC0000';
-              td.style.fontWeight = '600';
-              td.style.textAlign = 'center';
-              td.textContent = cell;
-            } else if (isProc) {
-              td.style.textAlign = 'center';
-              td.style.padding = '8px 4px';
-              if (isZero) {
-                td.classList.add('proc-cell-zero');
-              } else {
-                td.classList.add('proc-cell-val');
-              }
-              td.textContent = cell;
-            } else {
-              td.textContent = cell;
-              const loadNameCol = data.columns.findIndex(c => c.toLowerCase().includes('drug') && c.toLowerCase().includes('name'));
-              if (i !== loadNameCol) td.style.textAlign = 'center';
-            }
-            tr.appendChild(td);
-          });
-          tbody.appendChild(tr);
-        });
-
-        const showingEl = document.getElementById('showing-count');
-        showingEl.textContent = Math.min(parseInt(showingEl.textContent) + data.rows.length, TOTAL_COUNT);
-
-        hasMore = data.has_more;
-        if (hasMore) {
-          document.getElementById('load-more-btn').style.display = 'block';
-        }
-      }
-    } catch (e) {
-      console.error('Load more error:', e);
-      document.getElementById('load-more-btn').style.display = 'block';
-    } finally {
-      isLoading = false;
-      document.getElementById('load-spinner').style.display = 'none';
-    }
+  // ── Excel export ─────────────────────────────────────────────────────────
+  function exportExcel() {
+    currentSearch = document.getElementById('search-box').value.trim();
+    const params = new URLSearchParams({ job_id: JOB_ID });
+    if (currentSearch)              params.set('search',    currentSearch);
+    if (activeSev)                  params.set('severity',  activeSev);
+    if (activeTypeFilter !== 'all') params.set('drug_type', activeTypeFilter);
+    if (activeProcs.size < PROC_COLS.length)
+      params.set('processor', [...activeProcs].join(','));
+    window.location.href = `/api/export_excel/${SHEET_KEY}?${params}`;
   }
 
-  // Init
-  buildHeader();
-  buildProcPills();
-  computeStats();
-  applyFilters();
+  // ── Init ─────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    buildHeader();
+    buildProcPills();
+    loadAllRows();
+  });
 </script>
 </body>
 </html>

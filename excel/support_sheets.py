@@ -4,6 +4,7 @@ import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
 def create_never_ordered_check_sheet(wb, final_data):
@@ -49,8 +50,10 @@ def create_never_ordered_check_sheet(wb, final_data):
     mask = (df['Total Purchased'] == 0) & billed_mask
 
     # Build output
+    if 'Drug Type' not in df.columns:
+        df['Drug Type'] = 'Unclassified'
     display_columns = (['Drug Name', 'NDC #', 'Package Size', 'Total Purchased']
-                       + p_cols)
+                       + p_cols + ['Drug Type'])
     out = df.loc[mask, display_columns].copy()
     out.rename(columns={'Package Size': 'Pkg Size'}, inplace=True)
 
@@ -147,6 +150,16 @@ def create_never_ordered_check_sheet(wb, final_data):
     # Freeze panes
     ws.freeze_panes = 'A3'
     ws.auto_filter.ref = f"A2:{get_column_letter(len(display_columns))}{ws.max_row}"
+    last_row = ws.max_row
+    n_cols = len(out.columns)
+    tab = Table(displayName="TableNeverOrdered",
+                ref=f"A2:{get_column_letter(n_cols)}{last_row}")
+    tab.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium2", showRowStripes=True,
+        showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
+    ws.add_table(tab)
+    dt_idx = display_columns.index('Drug Type') + 1
+    ws.column_dimensions[get_column_letter(dt_idx)].width = 14
 
 
 def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc):

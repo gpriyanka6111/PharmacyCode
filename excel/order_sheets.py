@@ -7,6 +7,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.worksheet.pagebreak import PageBreak
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from excel.formatting import set_print_area_excluding_headers
 
@@ -62,25 +63,20 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
 
     # --- 3) Build display frame (use ORIGINAL *_D values)
     base_sel_cols = ['NDC #', 'Drug Name', 'Package Size'] + difference_columns
-    if 'Drug Type' in df.columns:
-        base_sel_cols.append('Drug Type')
     out = df.loc[mask, base_sel_cols].copy()
     out['Do Not Order'] = min_positive.loc[mask]
     out['Paper Work'] = " "
+    if 'Drug Type' in df.columns:
+        out['Drug Type'] = df.loc[mask, 'Drug Type'].values
+    else:
+        out['Drug Type'] = 'Unclassified'
     out.rename(columns={'Package Size': 'Pkg Size'}, inplace=True)
 
-    if 'Drug Type' in out.columns:
-        display_columns = (
-            ['NDC #', 'Drug Name', 'Pkg Size'] +
-            difference_columns +
-            ['Do Not Order', 'Paper Work', 'Drug Type']
-        )
-    else:
-        display_columns = (
-            ['NDC #', 'Drug Name', 'Pkg Size'] +
-            difference_columns +
-            ['Do Not Order', 'Paper Work']
-        )
+    display_columns = (
+        ['NDC #', 'Drug Name', 'Pkg Size'] +
+        difference_columns +
+        ['Do Not Order', 'Paper Work', 'Drug Type']
+    )
     out = out[display_columns].sort_values('Drug Name')
 
     # --- 4) Title row
@@ -135,10 +131,6 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
             cell.alignment = Alignment(
                 horizontal='center', vertical='center', wrap_text=True)
 
-    if 'Drug Type' in display_columns:
-        ws.column_dimensions[get_column_letter(
-            display_columns.index('Drug Type') + 1)].width = 16
-
     # --- 7) Borders and header height
     thin = Border(left=Side(style='thin'), right=Side(style='thin'),
                   top=Side(style='thin'), bottom=Side(style='thin'))
@@ -171,6 +163,16 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
     # --- 8) Freeze panes
     ws.freeze_panes = 'A3'
     ws.auto_filter.ref = f"A2:{get_column_letter(len(display_columns))}{ws.max_row}"
+    last_row = ws.max_row
+    n_cols = len(display_columns)
+    tab = Table(displayName="TableDoNotOrder",
+                ref=f"A2:{get_column_letter(n_cols)}{last_row}")
+    tab.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium2", showRowStripes=True,
+        showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
+    ws.add_table(tab)
+    dt_idx = display_columns.index('Drug Type') + 1
+    ws.column_dimensions[get_column_letter(dt_idx)].width = 14
 
 
 def add_max_difference_sheet(wb, final_data, insurance_paths=None):
@@ -250,20 +252,17 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
     needs['Total Order Price'] = needs['To Order'] * needs['PRICE']
     needs['Total Order Price'] = pd.to_numeric(
         needs['Total Order Price'], errors='coerce').fillna(0)
+    if 'Drug Type' in df.columns:
+        needs['Drug Type'] = df.loc[needs_mask, 'Drug Type'].values
+    else:
+        needs['Drug Type'] = 'Unclassified'
 
     # 5) Build display frame (keep ORIGINAL *_D values = positives visible)
-    if 'Drug Type' in df.columns:
-        display_columns = (
-            ['NDC #', 'Drug Name', 'Pkg Size'] +
-            difference_columns +
-            ['To Order', 'Paper Work', 'PRICE', 'Total Order Price', 'Drug Type']
-        )
-    else:
-        display_columns = (
-            ['NDC #', 'Drug Name', 'Pkg Size'] +
-            difference_columns +
-            ['To Order', 'Paper Work', 'PRICE', 'Total Order Price']
-        )
+    display_columns = (
+        ['NDC #', 'Drug Name', 'Pkg Size'] +
+        difference_columns +
+        ['To Order', 'Paper Work', 'PRICE', 'Total Order Price', 'Drug Type']
+    )
     needs = needs[display_columns].sort_values('Drug Name')
 
     # 6) Title row
@@ -332,10 +331,6 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
             cell.alignment = Alignment(
                 horizontal='center', vertical='center', wrap_text=True)
 
-    if 'Drug Type' in display_columns:
-        ws.column_dimensions[get_column_letter(
-            display_columns.index('Drug Type') + 1)].width = 16
-
     # 9) Borders and header height
     thin = Border(left=Side(style='thin'), right=Side(style='thin'),
                   top=Side(style='thin'), bottom=Side(style='thin'))
@@ -394,8 +389,8 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
     if top_total_hdr_col is None:
         top_total_hdr_col = display_columns.index("Total Order Price") + 1
 
-    summary_label_col = top_total_hdr_col + 1
-    summary_value_col = top_total_hdr_col + 2
+    summary_label_col = top_total_hdr_col + 2  # skip Drug Type column
+    summary_value_col = top_total_hdr_col + 3
 
     hdr_cell = ws.cell(row=2, column=summary_label_col,
                        value="Insurance-wise Order Estimate ($)")
@@ -491,3 +486,11 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
 
     # === Filter range limited to data only (keeps footer fixed) ===
     ws.auto_filter.ref = f"A2:{get_column_letter(len(display_columns))}{last_data_row}"
+    tab = Table(displayName="TableNeedsOrder",
+                ref=f"A2:{get_column_letter(len(display_columns))}{last_data_row}")
+    tab.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium2", showRowStripes=True,
+        showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
+    ws.add_table(tab)
+    dt_idx = display_columns.index('Drug Type') + 1
+    ws.column_dimensions[get_column_letter(dt_idx)].width = 14
