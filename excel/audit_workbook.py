@@ -169,6 +169,8 @@ def generate_master_audit_workbook(final_df, pharmacy_name, date_range, output_d
 
         # Make sure there is no pandas <NA> for openpyxl
         df = df.copy()
+        _num_cols = df.select_dtypes(include='number').columns
+        df[_num_cols] = df[_num_cols].round(2)
         df = df.astype(object).where(pd.notna(df), None)
 
         cols = list(df.columns)

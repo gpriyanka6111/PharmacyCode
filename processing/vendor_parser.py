@@ -7,9 +7,18 @@ import numpy as np
 import pandas as pd
 
 
+def read_vendor_file(path):
+    ext = os.path.splitext(path)[1].lower()
+    if ext == '.csv':
+        return pd.read_csv(path, dtype=str)
+    if ext in ('.xlsx', '.xls'):
+        return pd.read_excel(path, dtype=str)
+    raise ValueError("Vendor file must be CSV or Excel")
+
+
 def parse_vendor_files(vendor_paths):
     """
-    Read every vendor CSV in vendor_paths, normalise headers/NDC/Shipped/PRICE,
+    Read every vendor CSV/Excel file in vendor_paths, normalise headers/NDC/Shipped/PRICE,
     stash Kinray rows for month-aware price lookups, and build the qty + price pivots.
 
     Returns
@@ -43,7 +52,7 @@ def parse_vendor_files(vendor_paths):
         return None
 
     for i, vp in enumerate(vendor_paths, start=1):
-        raw = pd.read_csv(vp, dtype=str)
+        raw = read_vendor_file(vp)
 
         # Normalize headers
         raw.columns = _norm_headers(raw.columns)

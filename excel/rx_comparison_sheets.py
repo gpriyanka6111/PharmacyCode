@@ -7,7 +7,61 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
 
-from processing.kinray_pricing import find_kinray_price_by_month
+
+def _build_kinray_price_table(kinray_df, max_month):
+    """
+    Build a price lookup table: NDC_norm x Month -> unit price.
+    Uses ffill (backward search) then bfill (forward search) per NDC
+    to replicate find_kinray_price_by_month() fallback logic:
+      1. Same month -> use latest price
+      2. Search backwards (ffill)
+      3. Search forwards (bfill)
+      4. Return 0 if never found
+    """
+    kdf = kinray_df.copy()
+
+    # Normalize NDC
+    kdf['NDC_norm'] = (kdf['NDC #'].astype(str)
+        .str.replace(r'\D', '', regex=True).str.zfill(11))
+
+    # Parse date and derive month
+    kdf['DATE'] = pd.to_datetime(kdf['DATE'], errors='coerce')
+    kdf = kdf.dropna(subset=['DATE', '__UnitPrice__'])
+    kdf['Month'] = kdf['DATE'].dt.to_period('M')
+
+    # Take latest price per NDC per month
+    price_table = (kdf.sort_values('DATE')
+        .groupby(['NDC_norm', 'Month'], as_index=False)
+        .agg(__unit_price__=('__UnitPrice__', 'last'))
+    )
+
+    if price_table.empty:
+        return price_table
+
+    # Build full month grid from earliest Kinray month to max fill date month
+    min_month = price_table['Month'].min()
+    all_months = pd.period_range(min_month, max_month, freq='M')
+    all_ndcs = price_table['NDC_norm'].unique()
+
+    full_grid = pd.MultiIndex.from_product(
+        [all_ndcs, all_months],
+        names=['NDC_norm', 'Month']
+    ).to_frame(index=False)
+
+    # Merge known prices onto full grid
+    price_filled = full_grid.merge(price_table, on=['NDC_norm', 'Month'], how='left')
+
+    # ffill = backward search, bfill = forward search
+    price_filled = (price_filled
+        .sort_values(['NDC_norm', 'Month'])
+        .groupby('NDC_norm', group_keys=False)
+        .apply(lambda g: g.assign(
+            __unit_price__=g['__unit_price__'].ffill().bfill()
+        ))
+        .reset_index(drop=True)
+    )
+
+    return price_filled[['NDC_norm', 'Month', '__unit_price__']]
 
 
 def add_rx_unit_compare_sheet_exact(
@@ -54,11 +108,18 @@ def add_rx_unit_compare_sheet_exact(
     else:
         df['Fill Date'] = pd.NaT
 
-    # Apply month-based Kinray price lookup
-    df['Kinray Unit Price'] = df.apply(
-        lambda row: find_kinray_price_by_month(row['NDC #'], row['Fill Date'], kinray_df),
-        axis=1
-    )
+    # Vectorized price lookup with backward/forward fallback
+    df['NDC_norm'] = df['NDC #'].astype(str).str.zfill(11)
+    df['Month'] = df['Fill Date'].dt.to_period('M')
+    _max_month = df['Month'].max()
+    _price_table = _build_kinray_price_table(kinray_df, _max_month)
+    if not _price_table.empty:
+        df = df.merge(_price_table, on=['NDC_norm', 'Month'], how='left')
+        df['Kinray Unit Price'] = df['__unit_price__'].fillna(0)
+        df.drop(columns=['NDC_norm', 'Month', '__unit_price__'], inplace=True, errors='ignore')
+    else:
+        df['Kinray Unit Price'] = 0
+        df.drop(columns=['NDC_norm', 'Month'], inplace=True, errors='ignore')
 
     # --- Winning insurance paid ---
     df['Ins paid'] = np.where(
@@ -129,6 +190,8 @@ def add_rx_unit_compare_sheet_exact(
     out = df.loc[:, out_cols].copy()
     # latest first, then largest diff
     out = out.sort_values('Drug Name', ascending=True)
+    _num_cols = out.select_dtypes(include='number').columns
+    out[_num_cols] = out[_num_cols].round(2)
 
     # # If no underpaid rows, create placeholder sheet
     # if out.empty:
@@ -172,13 +235,6 @@ def add_rx_unit_compare_sheet_exact(
         ws[cell_ref].alignment = Alignment(
             horizontal='center', vertical='center', wrap_text=True)
 
-    # Borders & formatting
-    thin = Border(left=Side(style='thin'), right=Side(style='thin'),
-                  top=Side(style='thin'), bottom=Side(style='thin'))
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=len(out_cols)):
-        for cell in row:
-            cell.border = thin
-
     widths = {
         'RX': 9, 'Fill Date': 12, 'NDC': 14, 'Drug Name': 45, 'Pkg Size': 8,
         'Pkgs Billed to Insurance': 12, 'Kinray Price (Pkgs Billed × Unit Price)': 18,
@@ -189,16 +245,6 @@ def add_rx_unit_compare_sheet_exact(
 
     for i, name in enumerate(out_cols, start=1):
         ws.column_dimensions[get_column_letter(i)].width = widths.get(name, 12)
-
-    # Number formats
-    for r in range(3, ws.max_row + 1):
-        for name in ['Kinray Price (Pkgs Billed × Unit Price)', 'Total Ins Paid = (Ins Paid + SDRA + COPAY)', 'Difference']:
-            idx = out_cols.index(name) + 1
-            ws.cell(row=r, column=idx).number_format = '"$"#,##0.00'
-        ws.cell(row=r, column=out_cols.index(
-            'Pkgs Billed to Insurance') + 1).number_format = '0.00'
-        ws.cell(row=r, column=out_cols.index(
-            'Fill Date') + 1).number_format = 'yyyy-mm-dd'
 
     last_data_row = ws.max_row
     total_row = last_data_row + 1
@@ -292,11 +338,18 @@ def add_rx_unit_compare_sheet_exact_pos(
     else:
         df['Fill Date'] = pd.NaT
 
-    # Apply month-based Kinray price lookup
-    df['Kinray Unit Price'] = df.apply(
-        lambda row: find_kinray_price_by_month(row['NDC #'], row['Fill Date'], kinray_df),
-        axis=1
-    )
+    # Vectorized price lookup with backward/forward fallback
+    df['NDC_norm'] = df['NDC #'].astype(str).str.zfill(11)
+    df['Month'] = df['Fill Date'].dt.to_period('M')
+    _max_month = df['Month'].max()
+    _price_table = _build_kinray_price_table(kinray_df, _max_month)
+    if not _price_table.empty:
+        df = df.merge(_price_table, on=['NDC_norm', 'Month'], how='left')
+        df['Kinray Unit Price'] = df['__unit_price__'].fillna(0)
+        df.drop(columns=['NDC_norm', 'Month', '__unit_price__'], inplace=True, errors='ignore')
+    else:
+        df['Kinray Unit Price'] = 0
+        df.drop(columns=['NDC_norm', 'Month'], inplace=True, errors='ignore')
 
     # --- Winning insurance paid ---
     df['Ins paid'] = np.where(
@@ -368,6 +421,8 @@ def add_rx_unit_compare_sheet_exact_pos(
     out = df.loc[:, out_cols].copy()
     # latest first, then largest diff
     out = out.sort_values('Drug Name', ascending=True)
+    _num_cols = out.select_dtypes(include='number').columns
+    out[_num_cols] = out[_num_cols].round(2)
 
     # # If no underpaid rows, create placeholder sheet
     # if out.empty:
@@ -411,13 +466,6 @@ def add_rx_unit_compare_sheet_exact_pos(
         ws[cell_ref].alignment = Alignment(
             horizontal='center', vertical='center', wrap_text=True)
 
-    # Borders & formatting
-    thin = Border(left=Side(style='thin'), right=Side(style='thin'),
-                  top=Side(style='thin'), bottom=Side(style='thin'))
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=len(out_cols)):
-        for cell in row:
-            cell.border = thin
-
     widths = {
         'RX': 9, 'NDC': 14, 'Drug Name': 45, 'Pkg Size': 8, 'Fill Date': 12,
         'Qty Filled': 8, 'Package Billed': 9, 'Kinray Final Price': 16,
@@ -430,18 +478,6 @@ def add_rx_unit_compare_sheet_exact_pos(
     for i, name in enumerate(out_cols, start=1):
         ws.column_dimensions[get_column_letter(i)].width = widths.get(name, 12)
 
-    # Number formats
-    for r in range(3, ws.max_row + 1):
-        for name in ['Kinray Final Price', 'Ins Paid', 'SDRA Amt', 'COPAY', 'Total Ins Paid = (Ins Paid + SDRA + COPAY)', 'Difference']:
-            idx = out_cols.index(name) + 1
-            ws.cell(row=r, column=idx).number_format = '"$"#,##0.00'
-        ws.cell(row=r, column=out_cols.index(
-            'Qty Filled') + 1).number_format = '0.0'
-        ws.cell(row=r, column=out_cols.index(
-            'Package Billed') + 1).number_format = '0.0'
-        ws.cell(row=r, column=out_cols.index(
-            'Fill Date') + 1).number_format = 'yyyy-mm-dd'
-
     diff_idx = out_cols.index('Difference') + 1
     last_data_row = ws.max_row
     total_row = last_data_row + 1
@@ -452,13 +488,7 @@ def add_rx_unit_compare_sheet_exact_pos(
                          value="Total Difference")
     label_cell.font = Font(bold=True, size=12)
     label_cell.alignment = Alignment(horizontal='center', vertical='center')
-    drug_idx = out_cols.index('Drug Name') + 1
     diff_idx = out_cols.index('Difference') + 1
-    left_idx = min(drug_idx, diff_idx)
-    right_idx = max(drug_idx, diff_idx)
-
-    left_col = get_column_letter(left_idx)
-    right_col = get_column_letter(right_idx)
 
     # Apply number format to Total Difference cell
     total_diff_cell = ws.cell(row=total_row, column=diff_idx)
@@ -532,10 +562,18 @@ def add_mfp_drugs_sheet(
         ws['A1'].font = Font(size=14, bold=True)
         return
 
-    df['Kinray Unit Price'] = df.apply(
-        lambda row: find_kinray_price_by_month(row['NDC #'], row['Fill Date'], kinray_df),
-        axis=1
-    )
+    # Vectorized price lookup with backward/forward fallback
+    df['NDC_norm'] = df['NDC #'].astype(str).str.zfill(11)
+    df['Month'] = df['Fill Date'].dt.to_period('M')
+    _max_month = df['Month'].max()
+    _price_table = _build_kinray_price_table(kinray_df, _max_month)
+    if not _price_table.empty:
+        df = df.merge(_price_table, on=['NDC_norm', 'Month'], how='left')
+        df['Kinray Unit Price'] = df['__unit_price__'].fillna(0)
+        df.drop(columns=['NDC_norm', 'Month', '__unit_price__'], inplace=True, errors='ignore')
+    else:
+        df['Kinray Unit Price'] = 0
+        df.drop(columns=['NDC_norm', 'Month'], inplace=True, errors='ignore')
 
     df['Package billed'] = np.where(
         df['Drug Pkg Size'] > 0,
@@ -573,6 +611,8 @@ def add_mfp_drugs_sheet(
         'Difference', 'BIN', 'PCN', 'Group'
     ]
     out = df.loc[:, out_cols].copy().sort_values(['Drug Name', 'Fill Date'], ascending=[True, False])
+    _num_cols = out.select_dtypes(include='number').columns
+    out[_num_cols] = out[_num_cols].round(2)
 
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(out_cols))
     title = ws.cell(row=1, column=1, value="MFP DRUGS")
@@ -593,9 +633,6 @@ def add_mfp_drugs_sheet(
                     cell.alignment = Alignment(horizontal='center', vertical='center')
 
     thin = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=len(out_cols)):
-        for cell in row:
-            cell.border = thin
 
     widths = {
         'RX': 9, 'Fill Date': 12, 'NDC': 14, 'Drug Name': 40, 'Pkg Size': 8,
@@ -607,22 +644,6 @@ def add_mfp_drugs_sheet(
     ws.row_dimensions[2].height = 45
     for i, name in enumerate(out_cols, start=1):
         ws.column_dimensions[get_column_letter(i)].width = widths.get(name, 12)
-
-    currency_cols = {
-        'Kinray Price (Pkgs × Unit Price)', 'Ins Paid Total', 'SDRA Amt',
-        'Total = (SDRA + Ins Paid Total)', 'Difference'
-    }
-    number_cols = {
-        'Pkgs Billed to Insurance': '0.00',
-        'Fill Date': 'yyyy-mm-dd'
-    }
-    for r in range(3, ws.max_row + 1):
-        for name in out_cols:
-            idx = out_cols.index(name) + 1
-            if name in currency_cols:
-                ws.cell(row=r, column=idx).number_format = '"$"#,##0.00'
-            elif name in number_cols:
-                ws.cell(row=r, column=idx).number_format = number_cols[name]
 
     last_data_row = ws.max_row
     total_row = last_data_row + 1

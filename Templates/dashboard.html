@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PharmaTrack — Dashboard</title>
+  <title>RxInsight — Dashboard</title>
 
   <!-- Google Font: DM Sans -->
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -13,68 +13,38 @@
 
   <style>
     :root {
-      --brand: #0f4c81;
+      --brand:       #0f4c81;
       --brand-light: #1a6bb5;
-      --brand-soft: #e8f2ff;
-      --accent: #00c48c;
-      --bg: #f7f9fc;
-      --border: #e2e8f0;
-      --ink: #1a202c;
-      --muted: #64748b;
+      --brand-soft:  #e8f2ff;
+      --brand-border:#c3d9f5;
+      --accent:      #00c48c;
+      --bg:          #f0f4f8;
+      --surface:     #ffffff;
+      --border:      #e2e8f0;
+      --ink:         #1a202c;
+      --muted:       #64748b;
+      --color-text-primary:         #1a202c;
+      --color-text-secondary:       #64748b;
+      --color-background-primary:   #ffffff;
+      --color-background-secondary: #f0f4f8;
+      --color-border-tertiary:      #e2e8f0;
+      --color-text-info:            #0f4c81;
+      --color-background-info:      #e8f2ff;
     }
 
     body {
       background: var(--bg);
       font-family: 'DM Sans', sans-serif;
       color: var(--ink);
-      padding-bottom: 60px;
     }
 
     /* ── Navbar ── */
-    .pt-navbar {
-      background: #fff;
-      border-bottom: 1px solid var(--border);
-      padding: 10px 0;
-      position: sticky;
-      top: 0;
-      z-index: 1050;
-    }
-    .pt-logo-box {
-      background: var(--brand);
-      color: #fff;
-      font-weight: 700;
-      font-size: 13px;
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      display: inline-grid;
-      place-items: center;
-      flex-shrink: 0;
-    }
-    .pt-brand-name { font-weight: 600; font-size: 1.05rem; color: var(--ink); }
-    .pt-pharmacy-badge {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 5px 14px;
-      font-size: 0.82rem;
-      font-weight: 500;
-      color: var(--ink);
-    }
-    .pt-nav-btn {
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 7px 14px;
-      font-size: 0.82rem;
-      font-weight: 500;
-      color: var(--ink);
-      cursor: pointer;
-      transition: 0.15s all;
-      text-align: center;
-      line-height: 1.3;
-    }
-    .pt-nav-btn:hover { background: var(--bg); border-color: #c3d9f5; color: var(--brand); }
+    .pt-navbar { background: var(--brand); padding: 10px 0; position: sticky; top: 0; z-index: 1050; }
+    .pt-logo-box { background: rgba(255,255,255,0.18); color: #fff; font-weight: 700; font-size: 13px; width: 36px; height: 36px; border-radius: 8px; display: inline-grid; place-items: center; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.25); }
+    .pt-brand-name { font-weight: 600; font-size: 1.05rem; color: #fff; }
+    .pt-pharmacy-badge { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 20px; padding: 5px 14px; font-size: 0.82rem; font-weight: 500; color: rgba(255,255,255,0.9); }
+    .pt-nav-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 7px 14px; font-size: 0.82rem; font-weight: 500; color: #fff; cursor: pointer; transition: 0.15s all; text-align: center; line-height: 1.3; }
+    .pt-nav-btn:hover { background: rgba(255,255,255,0.25); color: #fff; }
 
     /* ── Cards base ── */
     .pt-card {
@@ -235,12 +205,7 @@
     }
 
     /* ── Footer ── */
-    .app-footer {
-      position: fixed; bottom: 0; width: 100%;
-      text-align: center; font-size: 13px; color: #6c757d;
-      background: rgba(255,255,255,0.92); padding: 6px 0;
-      border-top: 1px solid var(--border); z-index: 1000;
-    }
+    .app-footer { text-align: center; font-size: 0.78rem; color: var(--muted); padding: 14px 0 20px; margin-top: 40px; }
 
     /* ── Kinray clickable card + breakdown panel ── */
     .metric.clickable { cursor: pointer; transition: all 0.15s; }
@@ -336,6 +301,17 @@
     .panel-table td { padding: 7px 12px; border-bottom: 0.5px solid var(--color-border-tertiary); }
     .panel-table tr:last-child td { border-bottom: none; }
     .panel-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; border-top: 0.5px solid var(--color-border-tertiary); font-size: 12px; color: var(--color-text-secondary); background: var(--color-background-secondary); }
+
+    /* Dark mode */
+    .dark-mode { background: #121212; color: #eee; }
+    .dark-mode .pt-card { background: #1e1e1e; border-color: #333; }
+    .dark-mode .alert-card.red   { background: #1a0f0f; border-color: #5a2020; }
+    .dark-mode .alert-card.amber { background: #1a1400; border-color: #5a4500; }
+    .dark-mode .alert-card.green { background: #0a1a0a; border-color: #1a4a1a; }
+    .dark-mode .alert-card.blue  { background: #0a0f1a; border-color: #1a2a4a; }
+    .dark-mode .panel { background: #1e1e1e; border-color: #333; }
+    .dark-mode .disc-table th, .dark-mode .disc-table td { border-color: #333; }
+    .dark-mode .app-footer { color: #888; }
   </style>
 </head>
 <body>
@@ -346,7 +322,7 @@
       <!-- Left: logo + brand + pharmacy badge -->
       <div class="d-flex align-items-center gap-2 me-2">
         <span class="pt-logo-box">Rx</span>
-        <span class="pt-brand-name">PharmaTrack</span>
+        <span class="pt-brand-name">RxInsight</span>
       </div>
       <span class="pt-pharmacy-badge">{{ pharmacy_name }} &mdash; {{ date_range }}</span>
 
@@ -466,7 +442,7 @@
 
     <!-- ── ALERT CARDS ── -->
     <div class="row g-3 mb-3">
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4">
         <div class="alert-card red h-100" onclick="window.location.href='/sheet/needs_ordering?job_id={{ job_id }}'" style="cursor:pointer">
           <div class="alert-num">{{ excel_data.needs_ordering.count | default(0) }}</div>
           <div class="alert-title">Drugs need ordering</div>
@@ -474,7 +450,7 @@
           <div class="alert-link">View order list</div>
         </div>
       </div>
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4">
         <div class="alert-card amber h-100" onclick="window.location.href='/sheet/never_purchased?job_id={{ job_id }}'" style="cursor:pointer">
           <div class="alert-num">{{ excel_data.never_purchased.count | default(0) }}</div>
           <div class="alert-title">Never purchased &mdash; check</div>
@@ -482,7 +458,7 @@
           <div class="alert-link">Investigate now</div>
         </div>
       </div>
-      <div class="col-6 col-md-3">
+      <div class="col-12 col-md-4">
         <div class="alert-card green h-100" onclick="window.location='/sheet/do_not_order?job_id={{ job_id }}'" style="cursor:pointer">
           <div class="alert-num">{{ excel_data.do_not_order.count | default(0) }}</div>
           <div class="alert-title">Drugs overstocked</div>
@@ -490,12 +466,49 @@
           <div class="alert-link">View do-not-order list</div>
         </div>
       </div>
-      <div class="col-6 col-md-3">
-        <div class="alert-card blue h-100" onclick="window.location.href='/sheet/rx_comparison?job_id={{ job_id }}'" style="cursor:pointer">
-          <div class="alert-num">{{ excel_data.rx_comparison.count | default(0) }}</div>
-          <div class="alert-title">Rx comparisons analyzed</div>
-          <div class="alert-sub">47 underpayments detected</div>
-          <div class="alert-link">View full comparison</div>
+    </div>
+
+    <!-- ── RX COMPARISON — summary card, no table ── -->
+    <div class="row g-3 mb-3">
+      <div class="col-12">
+        <div class="pt-card">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div style="width:36px;height:36px;border-radius:8px;background:var(--brand-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <i class="bi bi-receipt" style="color:var(--brand);font-size:16px"></i>
+            </div>
+            <div>
+              <div style="font-weight:600;font-size:0.95rem;color:var(--ink)">RX Comparison</div>
+              <div style="font-size:0.78rem;color:var(--muted)">Billing vs purchasing discrepancy analysis</div>
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-6 col-md-4">
+              <div style="background:var(--bg);border-radius:8px;padding:14px">
+                <div style="font-size:0.75rem;color:var(--muted);font-weight:500;margin-bottom:4px">Total RX Analyzed</div>
+                <div style="font-size:1.6rem;font-weight:600;color:var(--ink)">{{ '{:,}'.format(summary.total_rx | default(0) | int) }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-md-4">
+              <div style="background:var(--bg);border-radius:8px;padding:14px">
+                <div style="font-size:0.75rem;color:var(--muted);font-weight:500;margin-bottom:4px">Underpaid RX</div>
+                <div style="font-size:1.6rem;font-weight:600;color:#dc2626">{{ underpaid_count | default(0) }}</div>
+              </div>
+            </div>
+            <div class="col-12 col-md-4">
+              <div style="background:var(--bg);border-radius:8px;padding:14px">
+                <div style="font-size:0.75rem;color:var(--muted);font-weight:500;margin-bottom:4px">Total Underpaid</div>
+                <div style="font-size:1.6rem;font-weight:600;color:#dc2626">${{ '{:,.2f}'.format(underpaid_total | default(0)) }}</div>
+              </div>
+            </div>
+          </div>
+          {% if main_filename %}
+          <a href="/download?filename={{ main_filename }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-download me-1"></i> Download Full RX Comparison (Excel)
+          </a>
+          <small class="text-muted ms-3">Open the downloaded Excel file to view all {{ '{:,}'.format(summary.total_rx | default(0) | int) }} rows</small>
+          {% else %}
+          <small class="text-muted">Generate a report to access the full RX Comparison data.</small>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -985,6 +998,16 @@
         }, 50);
       }
     }
+
+    // Dark mode toggle
+    (function(){
+      const btn=document.createElement('button'); btn.type='button';
+      btn.className='btn btn-sm btn-outline-secondary position-fixed top-0 end-0 m-3';
+      btn.style.zIndex=1081; btn.title='Toggle dark mode';
+      btn.innerHTML='<i class="bi bi-moon"></i>';
+      btn.onclick=()=>{ document.body.classList.toggle('dark-mode'); btn.innerHTML=document.body.classList.contains('dark-mode')?'<i class="bi bi-sun"></i>':'<i class="bi bi-moon"></i>'; };
+      document.body.appendChild(btn);
+    })();
   </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
-# PharmaTrack – Pharmacy Data Processing and Audit System
+# RxInsight – Pharmacy Data Processing and Audit System
 
 ## Overview
-PharmaTrack is a data processing application built to analyze pharmacy billing and purchase data. It generates structured Excel reports that help pharmacy owners understand financial performance and inventory needs.
+RxInsight is a data processing application built to analyze pharmacy billing and purchase data. It generates structured Excel reports that help pharmacy owners understand financial performance and inventory needs.
 
 The system processes multiple input files and applies business rules to identify losses, compare vendor purchases, and support audit workflows.
 
@@ -21,7 +21,7 @@ This data is usually handled manually in Excel, which leads to:
 ---
 
 ## Solution
-PharmaTrack automates the workflow:
+RxInsight automates the workflow:
 - Ingests multiple data sources
 - Applies pricing and insurance logic
 - Generates structured Excel reports with clear outputs

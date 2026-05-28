@@ -72,10 +72,8 @@ def add_autosum_by_processors(ws, processors, start_row, end_row, header_row=3):
             cell.font = Font(bold=True)
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-    # Optional: highlight the total row visually
-    for c in range(1, ws.max_column + 1):
-        ws.cell(row=total_row, column=c).border = Border(
-            top=Side(style="thick"))
+    # Top border on total row (header cells only — not full row scan)
+    ws.cell(row=total_row, column=1).border = Border(top=Side(style="thick"))
 
 
 def apply_common_sheet_settings(
@@ -153,10 +151,9 @@ def apply_common_sheet_settings(
             c.alignment = Alignment(horizontal="center", vertical="center")
             c.font = Font(size=cfg["font_size"], bold=True)
 
-            # Row heights
-            min_row = cfg.get("min_row_for_height", 2)
-            for row in sheet.iter_rows(min_row=min_row, max_row=sheet.max_row):
-                sheet.row_dimensions[row[0].row].height = 20
+            # Row height — set default via sheet properties, not per-row loop
+            sheet.sheet_format.defaultRowHeight = 20
+            sheet.sheet_format.customHeight = True
 
             # Orientation
             sheet.page_setup.orientation = cfg.get("orientation", "landscape")

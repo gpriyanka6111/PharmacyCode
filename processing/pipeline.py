@@ -12,7 +12,7 @@ from openpyxl.utils import get_column_letter
 
 from processing.log_parser import _filter_custom_log_transmitted_paid_ins
 from processing.all_pbm_parser import _load_all_pbm_csv
-from processing.vendor_parser import parse_vendor_files
+from processing.vendor_parser import parse_vendor_files, read_vendor_file
 from utils.helpers import unblock_file
 from excel.formatting import discover_processors_from_df, apply_common_sheet_settings
 from excel.order_sheets import add_max_difference_sheet, min_difference_sheet
@@ -27,16 +27,19 @@ from excel.processed_data_sheet import build_processed_data_sheet
 
 def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, pharmacy_name, date_range, all_pbm_path,
                             selected_processors=None, selected_sheets=None, vendor_count=None,
-                            job_dir=None, user_audit_dir=None):
+                            job_dir=None, user_audit_dir=None,
+                            cached_log_df=None, cached_kinray_df=None):
     # ===== Load =====
     bin_df = pd.read_csv(bin_master_path, dtype=str)
-    log_df = pd.read_csv(custom_log_path, dtype=str)
 
-    # Normalize incoming headers
-    log_df.columns = [str(c).strip() for c in log_df.columns]
-
-    # Keep only insurance-adjudicated rows early (ignore cash/other states)
-    log_df, _status_col, _kept_rows, _dropped_rows = _filter_custom_log_transmitted_paid_ins(log_df)
+    if cached_log_df is not None:
+        log_df = pd.DataFrame(cached_log_df)
+    else:
+        log_df = pd.read_csv(custom_log_path, dtype=str)
+        # Normalize incoming headers
+        log_df.columns = [str(c).strip() for c in log_df.columns]
+        # Keep only insurance-adjudicated rows early (ignore cash/other states)
+        log_df, _status_col, _kept_rows, _dropped_rows = _filter_custom_log_transmitted_paid_ins(log_df)
 
     # Normalize "Drug NDC" -> "NDC #", if needed
     for c in list(log_df.columns):
@@ -109,10 +112,11 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
     )
 
     # ===== Choose winning BIN per row =====
-    log_df['Winning_BIN'] = log_df.apply(
-        lambda r: r['Plan 1 BIN'] if r['Ins Paid Plan 1'] >= r['Ins Paid Plan 2'] else r['Plan 2 BIN'],
-        axis=1
-    ).str.zfill(6)
+    log_df['Winning_BIN'] = np.where(
+        log_df['Ins Paid Plan 1'] >= log_df['Ins Paid Plan 2'],
+        log_df['Plan 1 BIN'], log_df['Plan 2 BIN']
+    )
+    log_df['Winning_BIN'] = log_df['Winning_BIN'].str.zfill(6)
 
     # capture the winning insurance dollars only (this becomes Processor_T later)
     log_df['Winning_Paid'] = np.where(
@@ -472,13 +476,18 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         header_row = 2
         headers = [ws.cell(row=header_row, column=col).value
                    for col in range(1, ws.max_column + 1)]
-        if 'NDC #' not in headers:
+        def _header_index(header_name):
+            if header_name not in headers:
+                print(f"[DEBUG] {sheet_name}: missing optional column '{header_name}'")
+                return None
+            return headers.index(header_name) + 1
+
+        ndc_col = _header_index('NDC #')
+        if not ndc_col:
             return
 
-        ndc_col = headers.index('NDC #') + 1
-        if 'Drug Type' in headers:
-            type_col = headers.index('Drug Type') + 1
-        else:
+        type_col = _header_index('Drug Type')
+        if not type_col:
             type_col = ws.max_column + 1
             ws.cell(row=header_row, column=type_col, value='Drug Type')
 
@@ -493,14 +502,17 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
 
     kinray_type_map = {}
     try:
-        kinray_kpath = [path for path in vendor_paths if 'kinray' in path.lower()][0]
-        kdf = pd.read_csv(kinray_kpath, dtype=str)
-        kdf = kdf[
-            kdf['Invoice Number'].notna() &
-            (kdf['Invoice Number'].astype(str).str.strip().ne('')) &
-            (kdf['Invoice Number'].astype(str).str.strip().ne('nan')) &
-            (kdf['Invoice Number'].astype(str).str.strip().ne('Invoice Number'))
-        ].copy()
+        if cached_kinray_df is not None:
+            kdf = pd.DataFrame(cached_kinray_df)
+        else:
+            kinray_kpath = [path for path in vendor_paths if 'kinray' in path.lower()][0]
+            kdf = read_vendor_file(kinray_kpath)
+            kdf = kdf[
+                kdf['Invoice Number'].notna() &
+                (kdf['Invoice Number'].astype(str).str.strip().ne('')) &
+                (kdf['Invoice Number'].astype(str).str.strip().ne('nan')) &
+                (kdf['Invoice Number'].astype(str).str.strip().ne('Invoice Number'))
+            ].copy()
         kdf['NDC_norm'] = _normalize_ndc_series(kdf['NDC/UPC'])
         kinray_type_map = dict(zip(kdf['NDC_norm'], kdf['Type']))
     except Exception as e:
@@ -542,6 +554,13 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
             0, '⚠️ Check', 'This NDC had NaN in merged report — investigate!')
 
     # Save into app's processed folder so /download can serve it
+    required_main_columns = ['NDC #', 'Drug Name', 'Package Size']
+    missing_main_columns = [
+        col for col in required_main_columns if col not in final.columns]
+    if missing_main_columns:
+        raise ValueError(
+            f"Main report missing required column(s): {', '.join(missing_main_columns)}")
+
     safe_name = re.sub(r'[^A-Za-z0-9()._\-\s]+', '_',
                        f'{pharmacy_name} ({date_range}).xlsx')
     output_dir = os.path.join(current_app.root_path, current_app.config.get(
@@ -549,17 +568,12 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
     os.makedirs(output_dir, exist_ok=True)
     output_file = os.path.join(output_dir, safe_name)
     final_excel = final.drop(columns=['Drug Type'], errors='ignore')
-    final_excel.to_excel(output_file, index=False, float_format="%.3f")
-
-    #print(f"Processed file saved at: {output_file}")  # Debugging line
-
-    # written_data = pd.read_excel(output_file)
-    # written_data = final_df.copy()
-    if not os.path.exists(output_file):
-        raise FileNotFoundError(f"Processed file not found at {output_file}")
-
+    _num_cols = final_excel.select_dtypes(include='number').columns
+    final_excel[_num_cols] = final_excel[_num_cols].round(2)
+    with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
+        final_excel.to_excel(writer, sheet_name='Processed Data', index=False, float_format="%.3f")
     wb = load_workbook(output_file)
-    ws = wb.active
+    ws = wb['Processed Data']
     build_processed_data_sheet(wb, ws, final, desired_columns, processors,
                                pharmacy_name, date_range,
                                rx_compare_source, bin_to_proc)
@@ -567,40 +581,74 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
     vendor_dfs = []
     for p in vendor_paths:                      # you already build this list earlier
         try:
-            vendor_dfs.append(pd.read_csv(p, dtype=str))
+            vendor_dfs.append(read_vendor_file(p))
         except Exception as e:
             print(f"[warn] vendor read failed {p}: {e}")
 
     vendor_df_all = (pd.concat(vendor_dfs, ignore_index=True)
                      if vendor_dfs else pd.DataFrame())
 
+    audit_path = None
+    audit_name = None
     try:
-        # If your functions are in the same file, make sure they are defined ABOVE this call.
-        # `insurance_paths` is optional; pass None (or a list if you actually use it).
-        add_max_difference_sheet(wb, final, insurance_paths=None)
-        min_difference_sheet(wb, final, insurance_paths=None)
-        create_never_ordered_check_sheet(wb, final)
-        add_rx_unit_compare_sheet_exact(
-            wb, log_df=rx_compare_source, kinray_df=kinray_all, sheet_name="RX Comparison - All")
-        add_rx_unit_compare_sheet_exact_pos(
-            wb, log_df=rx_compare_source, kinray_df=kinray_all, sheet_name="RX Comparison +ve")
-        add_mfp_drugs_sheet(
-            wb, log_df=rx_compare_source, kinray_df=kinray_all, sheet_name="MFP Drugs - RX")
+        print(f"[DEBUG] Final dataframe columns before order helper sheets: {list(final.columns)}")
+        for helper_name, helper_func in [
+            ("Needs to be ordered - All", add_max_difference_sheet),
+            ("Do Not Order - ALL", min_difference_sheet),
+            ("Never Ordered - Check", create_never_ordered_check_sheet),
+        ]:
+            try:
+                helper_func(wb, final)
+            except Exception as e:
+                print(f"Order helper sheet skipped ({helper_name}): {e}")
+
+        for sheet_name, sheet_func in [
+            ("RX Comparison - All", add_rx_unit_compare_sheet_exact),
+            ("RX Comparison +ve", add_rx_unit_compare_sheet_exact_pos),
+            ("MFP Drugs - RX", add_mfp_drugs_sheet),
+        ]:
+            try:
+                sheet_func(
+                    wb,
+                    log_df=rx_compare_source,
+                    kinray_df=kinray_all,
+                    sheet_name=sheet_name
+                )
+            except Exception as e:
+                print(f"Optional sheet skipped ({sheet_name}): {e}")
         # add_zero_refills_sheet(
         #     wb, log_df=rx_compare_source, sheet_name="Refills 0 - Call Doctor")
         #add_missed_refill_revenue_sheet(
             #wb, log_df=rx_compare_source, sheet_name="Missed Refill - Revenue Recovery", grace_days=7)
-        add_summary_sheet(wb, processed_source="Processed Data", needs_title="Needs to be ordered - All",
-                          header_row=3, data_start_row=4, pharmacy_name=pharmacy_name,
-                          date_range=date_range, final_data=final)
+        kinray_total_precomputed = 0.0
+        try:
+            _kinv_col = next((c for c in kinray_all.columns
+                              if 'invoice' in c.lower() and '$' in c), None)
+            if _kinv_col is None and 'PRICE' in kinray_all.columns:
+                _kinv_col = 'PRICE'
+            if _kinv_col:
+                _kinv_vals = pd.to_numeric(kinray_all[_kinv_col], errors='coerce').fillna(0)
+                kinray_total_precomputed = float(_kinv_vals[_kinv_vals > 0].sum())
+        except Exception:
+            pass
+        print(f"[DEBUG] Kinray total: ${kinray_total_precomputed:,.2f}")
+
+        add_summary_sheet(
+            wb,
+            pharmacy_name=pharmacy_name,
+            date_range=date_range,
+            processors=processors,
+            final_data=final,
+            log_df=log_df,
+            kinray_df=kinray_all,
+            kinray_total=kinray_total_precomputed,
+        )
         #add_alternate_ndc_sheet(wb, custom_log_df, all_vendor_df)
         # ALT_SHEET_NAME = "Alternate NDC - Purchased"
         # add_alternate_ndc_sheet(wb, log_df, all_vendor_df, sheet_name=ALT_SHEET_NAME)
 
 
         audit_df = final_clean if 'final_clean' in locals() else final
-        audit_path = None
-        audit_name = None
         try:
             audit_path = generate_master_audit_workbook(
                 audit_df,
@@ -634,14 +682,7 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
     apply_common_sheet_settings(wb, pharmacy_name=pharmacy_name,
                                 date_range=date_range, processors=processors, header_row_main=3)
 
-    # Round numeric values in key sheets to 2 decimal places
-    for sheet_name in ["Needs to be ordered - All", "Do Not Order - ALL", "Never Ordered - Check", "Refills 0 - Call Doctor", "RX Comparison - All", "RX Comparison +ve", "Missed Refill - Revenue Recovery"]:
-        if sheet_name in wb.sheetnames:
-            ws = wb[sheet_name]
-            for row in ws.iter_rows(min_row=3):  # skip header rows
-                for cell in row:
-                    if isinstance(cell.value, (int, float)):
-                        cell.value = round(cell.value, 2)
+    # (numeric rounding handled by float_format="%.2f" at save time)
 
     # if selected_sheets:
     #     keep = set(selected_sheets)

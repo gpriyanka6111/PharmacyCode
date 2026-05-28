@@ -27,11 +27,24 @@ from werkzeug.utils import secure_filename
 
 from processing.log_parser import _filter_custom_log_transmitted_paid_ins
 from processing.pipeline import process_custom_log_data
+from processing.vendor_parser import read_vendor_file
 
 bp = Blueprint('main', __name__)
 
 # keep small "job context" between /upload -> /review -> /finalize
 _JOB_CACHE = {}  # { job_id: { "paths": {...}, "summary": {...}, "pharmacy_name":..., "date_range":... } }
+
+
+def _file_ext(upload):
+    return os.path.splitext(secure_filename(upload.filename))[1].lower()
+
+
+def _is_csv(upload):
+    return _file_ext(upload) == '.csv'
+
+
+def _is_vendor_file(upload):
+    return _file_ext(upload) in ('.csv', '.xlsx', '.xls')
 
 
 @bp.route('/') # Landing page with upload form
@@ -71,7 +84,7 @@ def upload_file():
     # ---- FILE OBJECTS ----
     custom_log_file = request.files.get('custom_log')      # CSV
     all_pbm_file = request.files.get('all_pbm')         # CSV (optional)
-    kinray_file = request.files.get('kinray_file')     # CSV
+    kinray_file = request.files.get('kinray_file')     # CSV/Excel
     bin_master_file = request.files.get('bin_master')      # CSV (required)
 
     # ---- Required uploads ----
@@ -84,6 +97,13 @@ def upload_file():
         return (f"Missing required file(s): {', '.join(missing)}. "
                 f"Got files: {list(request.files.keys())}", 400)
 
+    if not _is_csv(custom_log_file) or not _is_csv(bin_master_file):
+        return "Custom Log, ALL PBM, and BIN Master must be CSV", 400
+    if all_pbm_file and all_pbm_file.filename and not _is_csv(all_pbm_file):
+        return "Custom Log, ALL PBM, and BIN Master must be CSV", 400
+    if not _is_vendor_file(kinray_file):
+        return "Kinray file must be CSV or Excel", 400
+
     # ---- Save uploads to per-job dir ----
     updir = current_app.config['UPLOAD_FOLDER']
     os.makedirs(updir, exist_ok=True)
@@ -93,20 +113,15 @@ def upload_file():
     os.makedirs(job_dir, exist_ok=True)
 
     custom_log_path = os.path.join(job_dir, 'custom_log.csv')
-    kinray_path = os.path.join(job_dir, 'kinray.csv')
+    kinray_path = os.path.join(job_dir, f'kinray{_file_ext(kinray_file)}')
     bin_master_path = os.path.join(job_dir, 'bin_master.csv')
     all_pbm_path = None
-
-    if not kinray_file.filename.lower().endswith('.csv'):
-        return "KINRAY file must be a CSV.", 400
 
     custom_log_file.save(custom_log_path)
     kinray_file.save(kinray_path)
     bin_master_file.save(bin_master_path)
 
     if all_pbm_file and all_pbm_file.filename:
-        if not all_pbm_file.filename.lower().endswith('.csv'):
-            return "ALL PBM file must be a CSV.", 400
         all_pbm_path = os.path.join(job_dir, 'all_pbm.csv')
         all_pbm_file.save(all_pbm_path)
 
@@ -118,8 +133,10 @@ def upload_file():
             vname = (request.form.get(
                 f'vendor{i}_name') or f'Vendor{i}').strip()
             if vf and vf.filename:
+                if not _is_vendor_file(vf):
+                    return "Vendor file must be CSV or Excel", 400
                 safe = re.sub(r'[^A-Za-z0-9_.-]+', '_', vname) or f'Vendor{i}'
-                dest = os.path.join(job_dir, f'{safe}.csv')
+                dest = os.path.join(job_dir, f'{safe}{_file_ext(vf)}')
                 vf.save(dest)
                 vendor_paths.append(dest)
 
@@ -127,6 +144,7 @@ def upload_file():
         # ---- Build summary for review (processors, total Rx, $ by processor) ----
         log_df = pd.read_csv(custom_log_path, dtype=str)
         log_df, _status_col, _kept_rows, _dropped_rows = _filter_custom_log_transmitted_paid_ins(log_df)
+        _log_df_for_cache = log_df.copy()
         bin_df = pd.read_csv(bin_master_path, dtype=str)
         # Normalize BIN columns
         for col in ['Plan 1 BIN', 'Plan 2 BIN']:
@@ -143,11 +161,11 @@ def upload_file():
                 ).fillna(0)
 
         # Choose winning BIN and paid per row
-        log_df['Winning_BIN'] = log_df.apply(
-            lambda r: r['Plan 1 BIN']
-            if r['Ins Paid Plan 1'] >= r['Ins Paid Plan 2']
-            else r['Plan 2 BIN'], axis=1
-        ).str.zfill(6)
+        log_df['Winning_BIN'] = np.where(
+            log_df['Ins Paid Plan 1'] >= log_df['Ins Paid Plan 2'],
+            log_df['Plan 1 BIN'], log_df['Plan 2 BIN']
+        )
+        log_df['Winning_BIN'] = log_df['Winning_BIN'].astype(str).str.zfill(6)
 
         log_df['Winning_Paid'] = np.where(
             log_df['Winning_BIN'] == log_df['Plan 1 BIN'],
@@ -300,7 +318,7 @@ def upload_file():
             ).fillna(0).sum()
 
         # ---- Kinray Total (Real invoices only) ----
-        kinray_raw = pd.read_csv(kinray_path, dtype=str)
+        kinray_raw = read_vendor_file(kinray_path)
 
         kinray_clean = kinray_raw[
             kinray_raw['Invoice Number'].notna() &
@@ -436,7 +454,9 @@ def upload_file():
             },
             "pharmacy_name": pharmacy_name,
             "date_range": date_range,
-            "summary": summary
+            "summary": summary,
+            "_cached_log_df": _log_df_for_cache.to_dict('records'),
+            "_cached_kinray_df": kinray_clean.to_dict('records'),
         }
 
         return jsonify({
@@ -481,10 +501,10 @@ def email_report():
 
     # Build email with attachment
     msg = MIMEMultipart()
-    msg['Subject'] = "PharmaTrack Report"
+    msg['Subject'] = "RxInsight Report"
     msg['From'] = from_email
     msg['To'] = to_email
-    msg.attach(MIMEText(message or "Here's your PharmaTrack report."))
+    msg.attach(MIMEText(message or "Here's your RxInsight report."))
 
     ctype, enc = mimetypes.guess_type(attach_path)
     if ctype is None:
@@ -593,6 +613,8 @@ def finalize_job():
         # include Kinray first, then the extras
         vendor_paths = [paths["kinray"], *paths["vendors"]]
 
+        cached_log = ctx.get('_cached_log_df')
+        cached_kinray = ctx.get('_cached_kinray_df')
         result = process_custom_log_data(
             custom_log_path=paths["custom_log"],
             all_pbm_path=paths["all_pbm"],
@@ -603,6 +625,8 @@ def finalize_job():
             selected_processors=selected_processors,
             selected_sheets=selected_sheets,
             user_audit_dir=audit_save_dir,
+            cached_log_df=cached_log,
+            cached_kinray_df=cached_kinray,
         )
         if not result or not isinstance(result, dict):
             return jsonify({"ok": False, "error": "Report generation returned no filename"}), 500
@@ -617,7 +641,7 @@ def finalize_job():
         processed_dir = os.path.join(
             current_app.root_path, current_app.config.get('PROCESSED_FOLDER', 'processed'))
         main_path = os.path.join(processed_dir, main_name)
-        audit_path = os.path.join(processed_dir, audit_name)
+        audit_path = os.path.join(processed_dir, audit_name) if audit_name else None
 
         if not os.path.exists(main_path):
             # print("[finalize] processed dir listing:", os.listdir(processed_dir))
@@ -728,13 +752,12 @@ def finalize_job():
 
 
     except Exception as e:
-        return render_template('error.html',
-            title='Report Generation Failed',
-            message=str(e),
-            hint='Please try re-uploading your CSV files and running again.',
-            back_url='/',
-            back_label='Go Back to Upload'
-        ), 500
+        import traceback
+        traceback.print_exc()   # prints full traceback to terminal
+        return jsonify({
+            "ok": False,
+            "error": f"Finalize failed: {str(e)}"
+        }), 500
 
 
 @bp.route('/dashboard')
@@ -758,6 +781,18 @@ def dashboard():
     except Exception:
         log_df = pd.DataFrame()
     total_rx = len(log_df) or ctx.get('summary', {}).get('total_rx', 0)
+
+    # RX comparison summary stats — computed from in-memory log, no file reads
+    underpaid_count = 0
+    underpaid_total = 0.0
+    try:
+        if 'Difference' in log_df.columns:
+            neg = pd.to_numeric(log_df['Difference'], errors='coerce').fillna(0)
+            underpaid_count = int((neg < 0).sum())
+            underpaid_total = abs(float(neg[neg < 0].sum()))
+    except Exception:
+        pass
+    main_filename = os.path.basename(ctx.get('outfile_main', '') or '')
 
     top_doctors = []
     if 'Prescriber NPI #' in log_df.columns:
@@ -821,7 +856,6 @@ def dashboard():
             'needs_ordering': 'Needs to be ordered - All',
             'do_not_order': 'Do Not Order - ALL',
             'never_purchased': 'Never Ordered - Check',
-            'rx_comparison': 'RX Comparison - All',
         }.items():
             try:
                 df = pd.read_excel(
@@ -849,7 +883,7 @@ def dashboard():
     try:
         log = pd.read_csv(ctx['paths']['custom_log'], dtype=str)
 
-        kinray_raw = pd.read_csv(ctx['paths']['kinray'], dtype=str)
+        kinray_raw = read_vendor_file(ctx['paths']['kinray'])
 
         kinray_clean = kinray_raw[
             kinray_raw['Invoice Number'].notna() &
@@ -954,14 +988,14 @@ def dashboard():
     except Exception as e:
         print(f'[DEBUG] Insight 3: {e}')
 
-    # 4. Underpayments from Rx comparison
+    # 4. Rx comparison summary (no longer reads Excel — uses in-memory stats)
     try:
-        rx_count = excel_data.get('rx_comparison', {}).get('count', 0)
-        if rx_count > 0:
+        total_rx_val = summary.get('total_rx', 0)
+        if total_rx_val > 0:
             key_insights.append({
-                'type': 'amber',
-                'title': f"{rx_count} Rx comparisons analyzed",
-                'sub': 'Check Rx comparison sheet for underpayments eligible for dispute'
+                'type': 'amber' if underpaid_count > 0 else 'green',
+                'title': f"{total_rx_val:,} Rx analyzed — {underpaid_count} underpaid",
+                'sub': 'Download the Excel report to view full RX Comparison sheet'
             })
     except Exception as e:
         print(f'[DEBUG] Insight 4: {e}')
@@ -1028,7 +1062,10 @@ def dashboard():
         excel_data=excel_data,
         top_discrepancies=top_discrepancies,
         job_id=job_id,
-        key_insights=key_insights
+        key_insights=key_insights,
+        main_filename=main_filename,
+        underpaid_count=underpaid_count,
+        underpaid_total=underpaid_total,
     )
 
 
@@ -1477,61 +1514,8 @@ def sheet_never_purchased():
     )
 
 
-@bp.route('/sheet/rx_comparison')
-def sheet_rx_comparison():
-    job_id = request.args.get('job_id', '')
-    ctx = _JOB_CACHE.get(job_id)
-    if not ctx:
-        return redirect('/')
-
-    main_file = ctx.get('outfile_main')
-    sheet_data = {
-        'count': 0,
-        'columns': [],
-        'rows': []
-    }
-
-    if main_file and os.path.exists(main_file):
-        try:
-            df = pd.read_excel(
-                main_file,
-                sheet_name='RX Comparison - All',
-                dtype=str,
-                header=1
-            )
-            df = df.dropna(how='all').fillna('')
-            sheet_data = {
-                'count': len(df),
-                'columns': df.columns.tolist(),
-                'rows': df.head(100).values.tolist()
-            }
-        except Exception as e:
-            print(f'[DEBUG] RX Comparison sheet error: {e}')
-
-    return render_template(
-        'sheet_view.html',
-        job_id=job_id,
-        pharmacy_name=ctx.get('pharmacy_name', ''),
-        date_range=ctx.get('date_range', ''),
-        sheet_key='rx_comparison',
-        sheet_title='Rx comparison — underpayment analysis',
-        sheet_count=sheet_data['count'],
-        sheet_badge_color='#E6F1FB',
-        sheet_badge_text_color='#185FA5',
-        sheet_accent_color='#185FA5',
-        sheet_export_bg='#185FA5',
-        columns=sheet_data['columns'],
-        rows=sheet_data['rows'],
-        severity_col='Difference',
-        high_label='Underpaid >$10',
-        med_label='Underpaid $5-$10',
-        low_label='Underpaid <$5',
-        high_color='#E24B4A',
-        med_color='#EF9F27',
-        low_color='#639922',
-        drug_types=[],
-        stat_labels=None,
-    )
+# /sheet/rx_comparison removed — full table view caused 4+ min load for 54k rows.
+# RX Comparison data is still generated in the Excel file; use the download button.
 
 
 @bp.route('/load_report/<filename>')

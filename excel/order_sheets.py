@@ -5,11 +5,17 @@ import pandas as pd
 from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
-from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.worksheet.pagebreak import PageBreak
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from excel.formatting import set_print_area_excluding_headers
+
+
+def _safe_display_index(display_columns, column_name, context):
+    if column_name not in display_columns:
+        print(f"[DEBUG] {context}: missing optional column '{column_name}'")
+        return None
+    return display_columns.index(column_name) + 1
 
 
 def min_difference_sheet(wb, final_data, insurance_paths=None):
@@ -78,6 +84,8 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
         ['Do Not Order', 'Paper Work', 'Drug Type']
     )
     out = out[display_columns].sort_values('Drug Name')
+    _num_cols = out.select_dtypes(include='number').columns
+    out[_num_cols] = out[_num_cols].round(2)
 
     # --- 4) Title row
     ws.merge_cells(start_row=1, start_column=1, end_row=1,
@@ -88,26 +96,17 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
     ws.row_dimensions[1].height = 30
 
     # --- 5) Write table (headers at row 2; data from row 3)
-    for r_idx, row in enumerate(dataframe_to_rows(out, index=False, header=True), start=2):
-        for c_idx, val in enumerate(row, start=1):
-            cell = ws.cell(row=r_idx, column=c_idx, value=val)
-            if r_idx == 2:
-                # header
-                cell.font = Font(bold=True, size=12)
-                align = Alignment(horizontal='center', vertical='center')
-                if display_columns[c_idx - 1] in difference_columns + ['Pkg Size', 'Do Not Order']:
-                    align = Alignment(horizontal='center',
-                                      vertical='bottom', text_rotation=90)
-                cell.alignment = align
-            else:
-                # body
-                if display_columns[c_idx - 1] == 'Drug Name':
-                    cell.alignment = Alignment(
-                        horizontal='left', vertical='center', wrap_text=False)
-                else:
-                    cell.alignment = Alignment(
-                        horizontal='center', vertical='center')
-                cell.font = Font(size=12)
+    for c_idx, col_name in enumerate(display_columns, start=1):
+        cell = ws.cell(row=2, column=c_idx, value=col_name)
+        cell.font = Font(bold=True, size=12)
+        align = Alignment(horizontal='center', vertical='center')
+        if col_name in difference_columns + ['Pkg Size', 'Do Not Order']:
+            align = Alignment(horizontal='center', vertical='bottom', text_rotation=90)
+        cell.alignment = align
+
+    for r_idx, row_data in enumerate(out.itertuples(index=False, name=None), start=3):
+        for c_idx, val in enumerate(row_data, start=1):
+            ws.cell(row=r_idx, column=c_idx, value=val)
 
     # --- 6) Column widths
     ws.column_dimensions['A'].width = 15   # NDC #
@@ -115,16 +114,16 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
     ws.column_dimensions['C'].width = 7    # Pkg Size
 
     for col_name in difference_columns:
-        if col_name in display_columns:
-            idx = display_columns.index(col_name) + 1
+        idx = _safe_display_index(display_columns, col_name, "Do Not Order column widths")
+        if idx:
             ws.column_dimensions[get_column_letter(idx)].width = 7
     for col_name in ['Do Not Order', 'Pkg Size']:
-        if col_name in display_columns:
-            idx = display_columns.index(col_name) + 1
+        idx = _safe_display_index(display_columns, col_name, "Do Not Order column widths")
+        if idx:
             ws.column_dimensions[get_column_letter(idx)].width = 8
     # wrap Paper work column text
-    if 'Paper Work' in display_columns:
-        idx = display_columns.index('Paper Work') + 1
+    idx = _safe_display_index(display_columns, 'Paper Work', "Do Not Order paper work formatting")
+    if idx:
         ws.column_dimensions[get_column_letter(idx)].width = 10
         for r in range(3, ws.max_row + 1):
             cell = ws.cell(row=r, column=idx)
@@ -132,8 +131,6 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
                 horizontal='center', vertical='center', wrap_text=True)
 
     # --- 7) Borders and header height
-    thin = Border(left=Side(style='thin'), right=Side(style='thin'),
-                  top=Side(style='thin'), bottom=Side(style='thin'))
     thick = Border(left=Side(style='thick'), right=Side(style='thick'),
                    top=Side(style='thick'), bottom=Side(style='thick'))
 
@@ -143,23 +140,6 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
     for c in range(1, len(display_columns) + 1):
         ws.cell(row=2, column=c).border = thick
 
-    # Thin borders for data cells
-    for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=1, max_col=len(display_columns)):
-        for cell in row:
-            cell.border = thin
-
-    # Thick edge borders for key columns
-    def apply_column_border(ws_, col_idx):
-        col_letter = get_column_letter(col_idx)
-        for r in range(2, ws_.max_row + 1):
-            c = ws_[f"{col_letter}{r}"]
-            c.border = Border(left=thick.left, right=thick.right,
-                              top=c.border.top, bottom=c.border.bottom)
-
-    for key in ['NDC #', 'Drug Name', 'Pkg Size', 'Do Not Order', 'Paper Work']:
-        if key in display_columns:
-            apply_column_border(ws, display_columns.index(key) + 1)
-
     # --- 8) Freeze panes
     ws.freeze_panes = 'A3'
     ws.auto_filter.ref = f"A2:{get_column_letter(len(display_columns))}{ws.max_row}"
@@ -168,11 +148,12 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
     tab = Table(displayName="TableDoNotOrder",
                 ref=f"A2:{get_column_letter(n_cols)}{last_row}")
     tab.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium2", showRowStripes=True,
+        name="TableStyleMedium9", showRowStripes=True,
         showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
     ws.add_table(tab)
-    dt_idx = display_columns.index('Drug Type') + 1
-    ws.column_dimensions[get_column_letter(dt_idx)].width = 14
+    dt_idx = _safe_display_index(display_columns, 'Drug Type', "Do Not Order drug type width")
+    if dt_idx:
+        ws.column_dimensions[get_column_letter(dt_idx)].width = 14
 
 
 def add_max_difference_sheet(wb, final_data, insurance_paths=None):
@@ -264,6 +245,8 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
         ['To Order', 'Paper Work', 'PRICE', 'Total Order Price', 'Drug Type']
     )
     needs = needs[display_columns].sort_values('Drug Name')
+    _num_cols = needs.select_dtypes(include='number').columns
+    needs[_num_cols] = needs[_num_cols].round(2)
 
     # 6) Title row
     ws.merge_cells(start_row=1, start_column=1, end_row=1,
@@ -275,25 +258,17 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
     ws.row_dimensions[1].height = 30
     ws.row_dimensions[2].height = 80  # header
     # 7) Write the table (headers at row 2, data from row 3)
-    for r_idx, row in enumerate(dataframe_to_rows(needs, index=False, header=True), start=2):
-        for c_idx, val in enumerate(row, start=1):
-            cell = ws.cell(row=r_idx, column=c_idx, value=val)
-            if r_idx == 2:
-                # header style
-                cell.font = Font(bold=True, size=12)
-                align = Alignment(horizontal='center', vertical='center')
-                if display_columns[c_idx - 1] in difference_columns:
-                    align = Alignment(horizontal='center',
-                                      vertical='center', text_rotation=90)
-                cell.alignment = align
-            else:
-                # body style
-                if display_columns[c_idx - 1] == 'Drug Name':
-                    cell.alignment = Alignment(
-                        horizontal='left', vertical='center', wrap_text=False)
-                else:
-                    cell.alignment = Alignment(
-                        horizontal='center', vertical='center')
+    for c_idx, col_name in enumerate(display_columns, start=1):
+        cell = ws.cell(row=2, column=c_idx, value=col_name)
+        cell.font = Font(bold=True, size=12)
+        align = Alignment(horizontal='center', vertical='center')
+        if col_name in difference_columns:
+            align = Alignment(horizontal='center', vertical='center', text_rotation=90)
+        cell.alignment = align
+
+    for r_idx, row_data in enumerate(needs.itertuples(index=False, name=None), start=3):
+        for c_idx, val in enumerate(row_data, start=1):
+            ws.cell(row=r_idx, column=c_idx, value=val)
 
     # 8) Column widths
     ws.column_dimensions['A'].width = 15   # NDC #
@@ -304,32 +279,30 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
         horizontal='center', vertical='center', text_rotation=90)
 
     for col_name in difference_columns:
-        if col_name in display_columns:
-            idx = display_columns.index(col_name) + 1
+        idx = _safe_display_index(display_columns, col_name, "Needs Ordered column widths")
+        if idx:
             ws.column_dimensions[get_column_letter(idx)].width = 8
-    if 'To Order' in display_columns:
-        ws.column_dimensions[get_column_letter(
-            display_columns.index('To Order') + 1)].width = 12
-    # PAPER WORK column
-    if 'Paper Work' in display_columns:
-        idx = display_columns.index('Paper Work') + 1
+    idx = _safe_display_index(display_columns, 'To Order', "Needs Ordered column widths")
+    if idx:
         ws.column_dimensions[get_column_letter(idx)].width = 12
-        for r in range(3, ws.max_row + 1):
-            cell = ws.cell(row=r, column=idx)
-            cell.alignment = Alignment(
-                horizontal='center', vertical='center', wrap_text=True)
+    # PAPER WORK column
+    idx = _safe_display_index(display_columns, 'Paper Work', "Needs Ordered paper work formatting")
+    if idx:
+        col_letter = get_column_letter(idx)
+        ws.column_dimensions[col_letter].width = 12
+        ws.column_dimensions[col_letter].alignment = Alignment(
+            horizontal='center', vertical='center', wrap_text=True)
 
-    if 'PRICE' in display_columns:
-        ws.column_dimensions[get_column_letter(
-            display_columns.index('PRICE') + 1)].width = 12
+    idx = _safe_display_index(display_columns, 'PRICE', "Needs Ordered price width")
+    if idx:
+        ws.column_dimensions[get_column_letter(idx)].width = 12
     # TOTAL ORDER PRICE column
-    if 'Total Order Price' in display_columns:
-        idx = display_columns.index('Total Order Price') + 1
-        ws.column_dimensions[get_column_letter(idx)].width = 16
-        for r in range(3, ws.max_row + 1):
-            cell = ws.cell(row=r, column=idx)
-            cell.alignment = Alignment(
-                horizontal='center', vertical='center', wrap_text=True)
+    idx = _safe_display_index(display_columns, 'Total Order Price', "Needs Ordered total order price formatting")
+    if idx:
+        col_letter = get_column_letter(idx)
+        ws.column_dimensions[col_letter].width = 16
+        ws.column_dimensions[col_letter].alignment = Alignment(
+            horizontal='center', vertical='center', wrap_text=True)
 
     # 9) Borders and header height
     thin = Border(left=Side(style='thin'), right=Side(style='thin'),
@@ -339,44 +312,17 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
 
     for c in range(1, len(display_columns) + 1):
         ws.cell(row=2, column=c).border = thick
-    for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=1, max_col=len(display_columns)):
-        for cell in row:
-            cell.border = thin
-
-    # Edge thick borders for key columns (visual groups)
-    edge_cols = ['NDC #', 'Drug Name', 'Pkg Size', 'PRICE',
-                 'To Order', 'Total Order Price', 'Paper Work']
-    for name in edge_cols:
-        if name in display_columns:
-            idx = display_columns.index(name) + 1
-            col_letter = get_column_letter(idx)
-            for r in range(2, ws.max_row + 1):
-                c = ws[f"{col_letter}{r}"]
-                c.border = Border(
-                    left=thick.left if c.column == idx else c.border.left,
-                    right=thick.right if c.column == idx else c.border.right,
-                    top=c.border.top, bottom=c.border.bottom
-                )
     # --- page setup BEFORE summary is fine (heights, breaks, etc.) ---
     ws.print_title_rows = "2:2"
     ws.row_breaks = PageBreak()
-    for r in range(2, ws.max_row + 1):
-        ws.row_dimensions[2].height = 80
+    ws.row_dimensions[2].height = 80
     ws.freeze_panes = "A3"
     ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
 
-    # --- numeric formats for data columns ---
-    price_idx = display_columns.index('PRICE') + 1
-    total_idx = display_columns.index('Total Order Price') + 1
-    to_order_idx = display_columns.index('To Order') + 1
-    for r in range(3, ws.max_row + 1):
-        ws.cell(row=r, column=price_idx).number_format = '"$"#,##0.00'
-        ws.cell(row=r, column=total_idx).number_format = '"$"#,##0.00'
-        ws.cell(row=r, column=to_order_idx).number_format = '0'
-
+    price_idx = _safe_display_index(display_columns, 'PRICE', "Needs Ordered numeric formatting")
     # --- build the two summary columns (label + amount) ---
     def _find_header_col(ws, header_text, header_row=2):
         for c in range(1, ws.max_column + 1):
@@ -387,7 +333,11 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
 
     top_total_hdr_col = _find_header_col(ws, "Total Order Price", header_row=2)
     if top_total_hdr_col is None:
-        top_total_hdr_col = display_columns.index("Total Order Price") + 1
+        top_total_hdr_col = _safe_display_index(
+            display_columns, "Total Order Price", "Needs Ordered summary headers")
+    if top_total_hdr_col is None:
+        print("[DEBUG] Needs Ordered summary headers: skipping optional summary section")
+        top_total_hdr_col = len(display_columns)
 
     summary_label_col = top_total_hdr_col + 2  # skip Drug Type column
     summary_value_col = top_total_hdr_col + 3
@@ -405,23 +355,28 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
 
     # Lock the last data row BEFORE we start writing summary data
     last_data_row = ws.max_row
-    price_col_letter = get_column_letter(price_idx)
+    price_col_letter = get_column_letter(price_idx) if price_idx else None
 
-    r = 3
-    for diff_col in difference_columns:
-        ws.cell(row=r, column=summary_label_col, value=diff_col).alignment = Alignment(
-            horizontal="left", vertical="center")
-        diff_idx = display_columns.index(diff_col) + 1
-        diff_letter = get_column_letter(diff_idx)
-        formula = (
-            f"=SUMPRODUCT((-{diff_letter}3:{diff_letter}{last_data_row})"
-            f"*({diff_letter}3:{diff_letter}{last_data_row}<0),"
-            f"{price_col_letter}3:{price_col_letter}{last_data_row})"
-        )
-        vcell = ws.cell(row=r, column=summary_value_col, value=formula)
-        vcell.number_format = '"$"#,##0.00'
-        vcell.alignment = Alignment(horizontal="left", vertical="center")
-        r += 1
+    if price_col_letter:
+        r = 3
+        for diff_col in difference_columns:
+            ws.cell(row=r, column=summary_label_col, value=diff_col).alignment = Alignment(
+                horizontal="left", vertical="center")
+            diff_idx = _safe_display_index(display_columns, diff_col, "Needs Ordered summary formulas")
+            if not diff_idx:
+                continue
+            diff_letter = get_column_letter(diff_idx)
+            formula = (
+                f"=SUMPRODUCT((-{diff_letter}3:{diff_letter}{last_data_row})"
+                f"*({diff_letter}3:{diff_letter}{last_data_row}<0),"
+                f"{price_col_letter}3:{price_col_letter}{last_data_row})"
+            )
+            vcell = ws.cell(row=r, column=summary_value_col, value=formula)
+            vcell.number_format = '"$"#,##0.00'
+            vcell.alignment = Alignment(horizontal="left", vertical="center")
+            r += 1
+    else:
+        print("[DEBUG] Needs Ordered summary formulas: missing optional column 'PRICE'")
 
     # === Formatting for summary columns ===
     for col_idx in (summary_label_col, summary_value_col):
@@ -446,30 +401,33 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
         ws.cell(row=rr, column=summary_value_col).border = thin
 
     # === Grand Total footer OUTSIDE sort/filter range ===
-    total_col_idx = display_columns.index('Total Order Price') + 1
-    total_col_letter = get_column_letter(total_col_idx)
-    footer_row = last_data_row + 2
+    total_col_idx = _safe_display_index(display_columns, 'Total Order Price', "Needs Ordered grand total")
+    if total_col_idx:
+        total_col_letter = get_column_letter(total_col_idx)
+        footer_row = last_data_row + 2
 
-    ws.cell(row=footer_row, column=total_col_idx - 1,
-            value="Grand Total").font = Font(bold=True)
-    footer_total_cell = ws.cell(
-        row=footer_row, column=total_col_idx,
-        value=f"=SUBTOTAL(109,{total_col_letter}3:{total_col_letter}{last_data_row})"
-    )
-    footer_total_cell.font = Font(bold=True)
-    footer_total_cell.number_format = '"$"#,##0.00'
+        ws.cell(row=footer_row, column=total_col_idx - 1,
+                value="Grand Total").font = Font(bold=True)
+        footer_total_cell = ws.cell(
+            row=footer_row, column=total_col_idx,
+            value=f"=SUBTOTAL(109,{total_col_letter}3:{total_col_letter}{last_data_row})"
+        )
+        footer_total_cell.font = Font(bold=True)
+        footer_total_cell.number_format = '"$"#,##0.00'
 
-    # strong top border across the table width (not across summary columns)
-    for c in range(1, len(display_columns) + 1):
-        ws.cell(row=footer_row, column=c).border = Border(
-            top=Side(style='thick'))
+        # strong top border across the table width (not across summary columns)
+        for c in range(1, len(display_columns) + 1):
+            ws.cell(row=footer_row, column=c).border = Border(
+                top=Side(style='thick'))
 
     # === Add conditional formatting for negative values (light grey for B&W printing) ===
     grey_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")  # Light grey
 
     # Apply to all *_D columns
     for diff_col in difference_columns:
-        diff_idx = display_columns.index(diff_col) + 1
+        diff_idx = _safe_display_index(display_columns, diff_col, "Needs Ordered conditional formatting")
+        if not diff_idx:
+            continue
         diff_letter = get_column_letter(diff_idx)
         data_range = f"{diff_letter}3:{diff_letter}{last_data_row}"
 
@@ -489,8 +447,9 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
     tab = Table(displayName="TableNeedsOrder",
                 ref=f"A2:{get_column_letter(len(display_columns))}{last_data_row}")
     tab.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium2", showRowStripes=True,
+        name="TableStyleMedium9", showRowStripes=True,
         showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
     ws.add_table(tab)
-    dt_idx = display_columns.index('Drug Type') + 1
-    ws.column_dimensions[get_column_letter(dt_idx)].width = 14
+    dt_idx = _safe_display_index(display_columns, 'Drug Type', "Needs Ordered drug type width")
+    if dt_idx:
+        ws.column_dimensions[get_column_letter(dt_idx)].width = 14

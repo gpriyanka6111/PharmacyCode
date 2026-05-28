@@ -3,8 +3,14 @@
 import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, Side
 from openpyxl.utils import get_column_letter
-from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.worksheet.table import Table, TableStyleInfo
+
+
+def _safe_display_index(display_columns, column_name, context):
+    if column_name not in display_columns:
+        print(f"[DEBUG] {context}: missing optional column '{column_name}'")
+        return None
+    return display_columns.index(column_name) + 1
 
 
 def create_never_ordered_check_sheet(wb, final_data):
@@ -68,6 +74,8 @@ def create_never_ordered_check_sheet(wb, final_data):
         return
 
     out = out.sort_values('Drug Name')
+    _num_cols = out.select_dtypes(include='number').columns
+    out[_num_cols] = out[_num_cols].round(2)
 
     # Title row
     ws.merge_cells(start_row=1, start_column=1,
@@ -79,26 +87,16 @@ def create_never_ordered_check_sheet(wb, final_data):
     ws.row_dimensions[1].height = 30
 
     # Write table (headers at row 2, data from row 3)
-    for r_idx, row in enumerate(dataframe_to_rows(out, index=False, header=True), start=2):
-        for c_idx, value in enumerate(row, start=1):
-            cell = ws.cell(row=r_idx, column=c_idx, value=value)
-            if r_idx == 2:
-                # Header formatting
-                cell.font = Font(bold=True, size=12)
-                # Rotate insurance columns (Q/P/T) and Total Purchased
-                hdr = out.columns[c_idx - 1]
-                rotate = hdr in (p_cols + ['Total Purchased', 'Pkg Size'])
-                cell.alignment = Alignment(horizontal='center', vertical='center',
-                                           text_rotation=(90 if rotate else 0), wrap_text=True)
-            else:
-                # Body formatting
-                if out.columns[c_idx - 1] == 'Drug Name':
-                    cell.alignment = Alignment(
-                        horizontal='left', vertical='center', wrap_text=False)
-                else:
-                    cell.alignment = Alignment(
-                        horizontal='center', vertical='center')
-                cell.font = Font(size=12)
+    for c_idx, col_name in enumerate(out.columns, start=1):
+        cell = ws.cell(row=2, column=c_idx, value=col_name)
+        cell.font = Font(bold=True, size=12)
+        rotate = col_name in (p_cols + ['Total Purchased', 'Pkg Size'])
+        cell.alignment = Alignment(horizontal='center', vertical='center',
+                                   text_rotation=(90 if rotate else 0), wrap_text=True)
+
+    for r_idx, row_data in enumerate(out.itertuples(index=False, name=None), start=3):
+        for c_idx, val in enumerate(row_data, start=1):
+            ws.cell(row=r_idx, column=c_idx, value=val)
 
     # Header thick border
     thick = Border(left=Side(style='thick'), right=Side(style='thick'),
@@ -106,25 +104,6 @@ def create_never_ordered_check_sheet(wb, final_data):
     for col_idx in range(1, len(out.columns) + 1):
         ws.cell(row=2, column=col_idx).border = thick
 
-    # Thin borders for body
-    thin = Border(left=Side(style='thin'), right=Side(style='thin'),
-                  top=Side(style='thin'), bottom=Side(style='thin'))
-    for row in ws.iter_rows(min_row=3, max_row=ws.max_row, min_col=1, max_col=len(out.columns)):
-        for cell in row:
-            cell.border = thin
-
-    # Thick edge borders for key columns
-    def apply_column_border(sheet, col_idx):
-        col_letter = get_column_letter(col_idx)
-        for r in range(2, sheet.max_row + 1):
-            c = sheet[f"{col_letter}{r}"]
-            c.border = Border(left=thick.left, right=thick.right,
-                              top=c.border.top, bottom=c.border.bottom)
-
-    edge_cols = ['Drug Name', 'NDC #', 'Pkg Size', 'Total Purchased']
-    for name in edge_cols:
-        if name in out.columns:
-            apply_column_border(ws, out.columns.get_loc(name) + 1)
 
     # Column widths
     widths = {
@@ -155,11 +134,12 @@ def create_never_ordered_check_sheet(wb, final_data):
     tab = Table(displayName="TableNeverOrdered",
                 ref=f"A2:{get_column_letter(n_cols)}{last_row}")
     tab.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium2", showRowStripes=True,
+        name="TableStyleMedium9", showRowStripes=True,
         showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
     ws.add_table(tab)
-    dt_idx = display_columns.index('Drug Type') + 1
-    ws.column_dimensions[get_column_letter(dt_idx)].width = 14
+    dt_idx = _safe_display_index(display_columns, 'Drug Type', "Never Ordered drug type width")
+    if dt_idx:
+        ws.column_dimensions[get_column_letter(dt_idx)].width = 14
 
 
 def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc):

@@ -147,11 +147,7 @@ def build_processed_data_sheet(wb, ws, final, desired_columns, processors,
     _merge_band(2, net_s,  net_e,
                 "Net(Profit/Loss)$ = Actual $ Paid(BestRx) − Actual $ Purchased(Kinray)")
 
-    # ✅ Enable wrap text for Drug Name column (column B)
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=2, max_col=2):
-        for cell in row:
-            cell.alignment = Alignment(
-                horizontal='left', vertical='top', wrap_text=False)
+    # Column B alignment set via column_dimensions only — no per-cell loop needed
 
     # Set the desired column widths
     column_widths = {
@@ -269,57 +265,30 @@ def build_processed_data_sheet(wb, ws, final, desired_columns, processors,
     # AutoFilter over the full data region (row 3 headers)
     ws.auto_filter.ref = f"A{header_row}:{get_column_letter(ws.max_column)}{data_last_row}"
 
-    # Center align all data
-    for row in ws.iter_rows(min_row=4):
-        for cell in row:
-            cell.alignment = Alignment(horizontal='center', vertical='center')
-
-    # Set the first two columns to left alignment
-    for row in ws.iter_rows(min_row=4):
-        row[0].alignment = Alignment(horizontal='left',  vertical='center')
-        row[1].alignment = Alignment(horizontal='left',  vertical='center')
-        row[2].alignment = Alignment(horizontal='center', vertical='center')
+    # Note: per-cell alignment on 54k rows is too slow.
+    # Center alignment is the Excel default; left-align cols A/B via column style only.
 
     def apply_thick_border(ws, start_col, end_col, start_row, end_row):
-        # Apply the thick border to the top row
+        # Top edge
         for col_num in range(start_col, end_col + 1):
             cell = ws.cell(row=start_row, column=col_num)
-            cell.border = Border(
-                top=thick_border.top,
-                left=cell.border.left,
-                right=cell.border.right,
-                bottom=cell.border.bottom
-            )
-
-        # Apply the thick border to the bottom row
+            cell.border = Border(top=thick_border.top, left=cell.border.left,
+                                 right=cell.border.right, bottom=cell.border.bottom)
+        # Bottom edge
         for col_num in range(start_col, end_col + 1):
             cell = ws.cell(row=end_row, column=col_num)
-            cell.border = Border(
-                bottom=thick_border.bottom,
-                left=cell.border.left,
-                right=cell.border.right,
-                top=cell.border.top
-            )
-
-        # Apply the thick border to the left column
-        for row_num in range(start_row, end_row + 1):
+            cell.border = Border(bottom=thick_border.bottom, left=cell.border.left,
+                                 right=cell.border.right, top=cell.border.top)
+        # Left edge (skip corners already done)
+        for row_num in range(start_row + 1, end_row):
             cell = ws.cell(row=row_num, column=start_col)
-            cell.border = Border(
-                left=thick_border.left,
-                top=cell.border.top,
-                right=cell.border.right,
-                bottom=cell.border.bottom
-            )
-
-        # Apply the thick border to the right column
-        for row_num in range(start_row, end_row + 1):
+            cell.border = Border(left=thick_border.left, top=cell.border.top,
+                                 right=cell.border.right, bottom=cell.border.bottom)
+        # Right edge (skip corners already done)
+        for row_num in range(start_row + 1, end_row):
             cell = ws.cell(row=row_num, column=end_col)
-            cell.border = Border(
-                right=thick_border.right,
-                top=cell.border.top,
-                left=cell.border.left,
-                bottom=cell.border.bottom
-            )
+            cell.border = Border(right=thick_border.right, top=cell.border.top,
+                                 left=cell.border.left, bottom=cell.border.bottom)
     start_row = 1
     end_row = ws.max_row
 
