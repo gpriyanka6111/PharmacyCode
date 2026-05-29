@@ -81,7 +81,7 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
     display_columns = (
         ['NDC #', 'Drug Name', 'Pkg Size'] +
         difference_columns +
-        ['Do Not Order', 'Paper Work', 'Drug Type']
+        ['Do Not Order', 'Paper Work']
     )
     out = out[display_columns].sort_values('Drug Name')
     _num_cols = out.select_dtypes(include='number').columns
@@ -107,6 +107,15 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
     for r_idx, row_data in enumerate(out.itertuples(index=False, name=None), start=3):
         for c_idx, val in enumerate(row_data, start=1):
             ws.cell(row=r_idx, column=c_idx, value=val)
+
+    last_row = ws.max_row
+    last_col = len(display_columns)
+
+    # Center-align data cells from row 3 onward, column C onward.
+    for row in ws.iter_rows(min_row=3, max_row=last_row,
+                            min_col=3, max_col=last_col):
+        for cell in row:
+            cell.alignment = Alignment(horizontal='center', vertical='center')
 
     # --- 6) Column widths
     ws.column_dimensions['A'].width = 15   # NDC #
@@ -140,10 +149,47 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
     for c in range(1, len(display_columns) + 1):
         ws.cell(row=2, column=c).border = thick
 
+    thick_side = Side(style='thick')
+
+    def _apply_group_thick_border(ws, col_start, col_end, row_start, row_end):
+        """Draw a thick rectangle around a column group."""
+        for r in range(row_start, row_end + 1):
+            for c in range(col_start, col_end + 1):
+                cell = ws.cell(row=r, column=c)
+                left = thick_side if c == col_start else cell.border.left
+                right = thick_side if c == col_end else cell.border.right
+                top = thick_side if r == row_start else cell.border.top
+                bottom = thick_side if r == row_end else cell.border.bottom
+                cell.border = Border(left=left, right=right,
+                                     top=top, bottom=bottom)
+
+    for col_name in ['NDC #', 'Drug Name', 'Pkg Size', 'Do Not Order', 'Paper Work']:
+        idx = _safe_display_index(display_columns, col_name, f"Do Not Order thick border {col_name}")
+        if idx:
+            _apply_group_thick_border(ws, idx, idx, 2, last_row)
+
+    processor_cols = [display_columns.index(c) + 1
+                      for c in difference_columns if c in display_columns]
+    if processor_cols:
+        _apply_group_thick_border(ws, min(processor_cols), max(processor_cols),
+                                  2, last_row)
+
+    min_fill = PatternFill(start_color="D9D9D9",
+                           end_color="D9D9D9", fill_type="solid")
+    for row_offset, (_, row_data) in enumerate(out.iterrows(), start=3):
+        row_values = pd.to_numeric(row_data[difference_columns],
+                                   errors='coerce')
+        if row_values.dropna().empty:
+            continue
+        min_col_name = row_values.idxmin()
+        min_col_idx = _safe_display_index(
+            display_columns, min_col_name, f"Do Not Order min highlight {min_col_name}")
+        if min_col_idx:
+            ws.cell(row=row_offset, column=min_col_idx).fill = min_fill
+
     # --- 8) Freeze panes
     ws.freeze_panes = 'A3'
     ws.auto_filter.ref = f"A2:{get_column_letter(len(display_columns))}{ws.max_row}"
-    last_row = ws.max_row
     n_cols = len(display_columns)
     tab = Table(displayName="TableDoNotOrder",
                 ref=f"A2:{get_column_letter(n_cols)}{last_row}")
@@ -151,9 +197,6 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
         name="TableStyleMedium9", showRowStripes=True,
         showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
     ws.add_table(tab)
-    dt_idx = _safe_display_index(display_columns, 'Drug Type', "Do Not Order drug type width")
-    if dt_idx:
-        ws.column_dimensions[get_column_letter(dt_idx)].width = 14
 
 
 def add_max_difference_sheet(wb, final_data, insurance_paths=None):
@@ -238,11 +281,20 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
     else:
         needs['Drug Type'] = 'Unclassified'
 
+    # Purchase Status — Never Purchased if Total Purchased == 0
+    if 'Total Purchased' in df.columns:
+        needs['Purchase Status'] = df.loc[needs_mask, 'Total Purchased'].apply(
+            lambda x: 'Never Purchased' if pd.to_numeric(x, errors='coerce') == 0
+                      else 'Previously Purchased'
+        ).values
+    else:
+        needs['Purchase Status'] = 'Unknown'
+
     # 5) Build display frame (keep ORIGINAL *_D values = positives visible)
     display_columns = (
         ['NDC #', 'Drug Name', 'Pkg Size'] +
         difference_columns +
-        ['To Order', 'Paper Work', 'PRICE', 'Total Order Price', 'Drug Type']
+        ['To Order', 'Paper Work', 'PRICE', 'Purchase Status', 'Total Order Price']
     )
     needs = needs[display_columns].sort_values('Drug Name')
     _num_cols = needs.select_dtypes(include='number').columns
@@ -270,6 +322,22 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
         for c_idx, val in enumerate(row_data, start=1):
             ws.cell(row=r_idx, column=c_idx, value=val)
 
+    last_data_row = ws.max_row
+
+    # Center align all data cells from row 3 onwards
+    for _row in ws.iter_rows(min_row=3, max_row=ws.max_row,
+                              min_col=1, max_col=len(display_columns)):
+        for _cell in _row:
+            _cell.alignment = Alignment(horizontal='center', vertical='center')
+
+    for _col_name in ['NDC #', 'Drug Name']:
+        _idx = _safe_display_index(
+            display_columns, _col_name, f"Needs Ordered left align {_col_name}")
+        if _idx:
+            for _row_idx in range(3, ws.max_row + 1):
+                ws.cell(row=_row_idx, column=_idx).alignment = Alignment(
+                    horizontal='left', vertical='center')
+
     # 8) Column widths
     ws.column_dimensions['A'].width = 15   # NDC #
     ws.column_dimensions['B'].width = 50   # Drug Name
@@ -296,6 +364,10 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
     idx = _safe_display_index(display_columns, 'PRICE', "Needs Ordered price width")
     if idx:
         ws.column_dimensions[get_column_letter(idx)].width = 12
+    # PURCHASE STATUS column
+    idx = _safe_display_index(display_columns, 'Purchase Status', "Purchase Status width")
+    if idx:
+        ws.column_dimensions[get_column_letter(idx)].width = 18
     # TOTAL ORDER PRICE column
     idx = _safe_display_index(display_columns, 'Total Order Price', "Needs Ordered total order price formatting")
     if idx:
@@ -312,11 +384,49 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
 
     for c in range(1, len(display_columns) + 1):
         ws.cell(row=2, column=c).border = thick
+
+    thick_side = Side(style='thick')
+    thin_side = Side(style='thin')
+
+    def _apply_group_thick_border(ws, col_start, col_end, row_start, row_end):
+        """Draw a thick rectangle around a column group."""
+        for r in range(row_start, row_end + 1):
+            for c in range(col_start, col_end + 1):
+                cell = ws.cell(row=r, column=c)
+                left = thick_side if c == col_start else cell.border.left
+                right = thick_side if c == col_end else cell.border.right
+                top = thick_side if r == row_start else cell.border.top
+                bottom = thick_side if r == row_end else cell.border.bottom
+                cell.border = Border(left=left, right=right,
+                                     top=top, bottom=bottom)
+
+    _last_row = last_data_row
+
+    # Individual column thick borders: NDC#, Drug Name, Pkg Size
+    for _col_name in ['NDC #', 'Drug Name', 'Pkg Size']:
+        _idx = _safe_display_index(
+            display_columns, _col_name, f"thick border {_col_name}")
+        if _idx:
+            _apply_group_thick_border(ws, _idx, _idx, 2, _last_row)
+
+    # To Order, Paper Work, PRICE, Purchase Status, Total Order Price each gets its own thick border
+    for _col_name in ['To Order', 'Paper Work', 'PRICE', 'Purchase Status', 'Total Order Price']:
+        _idx = _safe_display_index(
+            display_columns, _col_name, f"thick border {_col_name}")
+        if _idx:
+            _apply_group_thick_border(ws, _idx, _idx, 2, _last_row)
+
+    # Entire processor array (*_D columns) gets one thick border around all of them together
+    _d_cols = [display_columns.index(c) + 1
+               for c in difference_columns if c in display_columns]
+    if _d_cols:
+        _apply_group_thick_border(ws, min(_d_cols), max(_d_cols), 2, _last_row)
+
     # --- page setup BEFORE summary is fine (heights, breaks, etc.) ---
     ws.print_title_rows = "2:2"
     ws.row_breaks = PageBreak()
     ws.row_dimensions[2].height = 80
-    ws.freeze_panes = "A3"
+    ws.freeze_panes = "D3"
     ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
@@ -353,8 +463,6 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
     val_hdr_cell.alignment = Alignment(
         horizontal="center", vertical="center", wrap_text=True)
 
-    # Lock the last data row BEFORE we start writing summary data
-    last_data_row = ws.max_row
     price_col_letter = get_column_letter(price_idx) if price_idx else None
 
     if price_col_letter:
@@ -420,20 +528,39 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
             ws.cell(row=footer_row, column=c).border = Border(
                 top=Side(style='thick'))
 
-    # === Add conditional formatting for negative values (light grey for B&W printing) ===
-    grey_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")  # Light grey
+    # === Conditional formatting: green/red on *_D columns ===
+    green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+    red_fill   = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
 
-    # Apply to all *_D columns
     for diff_col in difference_columns:
         diff_idx = _safe_display_index(display_columns, diff_col, "Needs Ordered conditional formatting")
         if not diff_idx:
             continue
         diff_letter = get_column_letter(diff_idx)
         data_range = f"{diff_letter}3:{diff_letter}{last_data_row}"
-
         ws.conditional_formatting.add(
             data_range,
-            CellIsRule(operator='lessThan', formula=['0'], stopIfTrue=False, fill=grey_fill)
+            CellIsRule(operator='lessThan', formula=['0'], stopIfTrue=False, fill=red_fill)
+        )
+        ws.conditional_formatting.add(
+            data_range,
+            CellIsRule(operator='greaterThan', formula=['0'], stopIfTrue=False, fill=green_fill)
+        )
+
+    # === Conditional formatting: Purchase Status ===
+    status_idx = _safe_display_index(display_columns, 'Purchase Status', "Purchase Status CF")
+    if status_idx:
+        status_letter = get_column_letter(status_idx)
+        status_range = f"{status_letter}3:{status_letter}{last_data_row}"
+        ws.conditional_formatting.add(
+            status_range,
+            CellIsRule(operator='equal', formula=['"Never Purchased"'],
+                       stopIfTrue=False, fill=red_fill)
+        )
+        ws.conditional_formatting.add(
+            status_range,
+            CellIsRule(operator='equal', formula=['"Previously Purchased"'],
+                       stopIfTrue=False, fill=green_fill)
         )
 
     # === NOW set print area to exclude the two summary columns ===
@@ -450,6 +577,3 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
         name="TableStyleMedium9", showRowStripes=True,
         showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
     ws.add_table(tab)
-    dt_idx = _safe_display_index(display_columns, 'Drug Type', "Needs Ordered drug type width")
-    if dt_idx:
-        ws.column_dimensions[get_column_letter(dt_idx)].width = 14

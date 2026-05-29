@@ -16,9 +16,7 @@ from processing.vendor_parser import parse_vendor_files, read_vendor_file
 from utils.helpers import unblock_file
 from excel.formatting import discover_processors_from_df, apply_common_sheet_settings
 from excel.order_sheets import add_max_difference_sheet, min_difference_sheet
-from excel.support_sheets import create_never_ordered_check_sheet
 from excel.rx_comparison_sheets import (add_rx_unit_compare_sheet_exact,
-                                        add_rx_unit_compare_sheet_exact_pos,
                                         add_mfp_drugs_sheet)
 from excel.summary_sheet import add_summary_sheet
 from excel.audit_workbook import generate_master_audit_workbook
@@ -34,12 +32,16 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
 
     if cached_log_df is not None:
         log_df = pd.DataFrame(cached_log_df)
+        _dropped_status_counts = {}
+        _kept_rows = len(log_df)
+        _dropped_rows = 0
     else:
         log_df = pd.read_csv(custom_log_path, dtype=str)
         # Normalize incoming headers
         log_df.columns = [str(c).strip() for c in log_df.columns]
         # Keep only insurance-adjudicated rows early (ignore cash/other states)
-        log_df, _status_col, _kept_rows, _dropped_rows = _filter_custom_log_transmitted_paid_ins(log_df)
+        log_df, _status_col, _kept_rows, _dropped_rows, _dropped_status_counts = \
+            _filter_custom_log_transmitted_paid_ins(log_df)
 
     # Normalize "Drug NDC" -> "NDC #", if needed
     for c in list(log_df.columns):
@@ -520,6 +522,8 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
 
     # Add Drug Type to final so generated sheets share the same source mapping.
     final = _apply_drug_type_column(final)
+    # Also apply to rx_compare_source so RX Comparison sheet shows correct Drug Type
+    rx_compare_source = _apply_drug_type_column(rx_compare_source)
 
     # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     # NEW: Split out rows that have NaN anywhere in the final report
@@ -562,7 +566,7 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
             f"Main report missing required column(s): {', '.join(missing_main_columns)}")
 
     safe_name = re.sub(r'[^A-Za-z0-9()._\-\s]+', '_',
-                       f'{pharmacy_name} ({date_range}).xlsx')
+                       f'{pharmacy_name}_Main ({date_range}).xlsx')
     output_dir = os.path.join(current_app.root_path, current_app.config.get(
         'PROCESSED_FOLDER', 'processed'))
     os.makedirs(output_dir, exist_ok=True)
@@ -572,11 +576,31 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
     final_excel[_num_cols] = final_excel[_num_cols].round(2)
     with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
         final_excel.to_excel(writer, sheet_name='Processed Data', index=False, float_format="%.3f")
+
+        # Set column-level alignment via xlsxwriter — instant, no row loop
+        _wb  = writer.book
+        _ws  = writer.sheets['Processed Data']
+        _left_fmt   = _wb.add_format({'align': 'left',   'valign': 'vcenter'})
+        _center_fmt = _wb.add_format({'align': 'center', 'valign': 'vcenter'})
+        # Columns A-B (0-1): left aligned (NDC#, Drug Name)
+        _ws.set_column(0, 1, None, _left_fmt)
+        # Column C (index 2): center aligned, width 8 (Package Size)
+        _ws.set_column(2, 2, 8, _center_fmt)
+        # Columns D onwards (3-500): center aligned
+        _ws.set_column(3, 500, None, _center_fmt)
+        # Set default row height for all data rows (row 4 onwards = index 1+ in xlsxwriter)
+        # xlsxwriter row index is 0-based; row 1 in Excel = index 0
+        # set_default_row sets height for ALL rows — rows 1-3 will be overridden by openpyxl
+        _ws.set_default_row(20)
     wb = load_workbook(output_file)
     ws = wb['Processed Data']
+    _total_csv_rows = (_kept_rows + _dropped_rows
+                       if cached_log_df is None else len(rx_compare_source))
     build_processed_data_sheet(wb, ws, final, desired_columns, processors,
                                pharmacy_name, date_range,
-                               rx_compare_source, bin_to_proc)
+                               rx_compare_source, bin_to_proc,
+                               dropped_status_counts=_dropped_status_counts,
+                               total_csv_rows=_total_csv_rows)
     # ===== Create/replace "Vendor Data" sheet =====
     vendor_dfs = []
     for p in vendor_paths:                      # you already build this list earlier
@@ -595,7 +619,6 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         for helper_name, helper_func in [
             ("Needs to be ordered - All", add_max_difference_sheet),
             ("Do Not Order - ALL", min_difference_sheet),
-            ("Never Ordered - Check", create_never_ordered_check_sheet),
         ]:
             try:
                 helper_func(wb, final)
@@ -604,7 +627,6 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
 
         for sheet_name, sheet_func in [
             ("RX Comparison - All", add_rx_unit_compare_sheet_exact),
-            ("RX Comparison +ve", add_rx_unit_compare_sheet_exact_pos),
             ("MFP Drugs - RX", add_mfp_drugs_sheet),
         ]:
             try:
@@ -620,18 +642,17 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         #     wb, log_df=rx_compare_source, sheet_name="Refills 0 - Call Doctor")
         #add_missed_refill_revenue_sheet(
             #wb, log_df=rx_compare_source, sheet_name="Missed Refill - Revenue Recovery", grace_days=7)
-        kinray_total_precomputed = 0.0
+        # Pre-compute kinray total — only positive Invoice $ rows (excludes service/rebate)
         try:
-            _kinv_col = next((c for c in kinray_all.columns
-                              if 'invoice' in c.lower() and '$' in c), None)
-            if _kinv_col is None and 'PRICE' in kinray_all.columns:
-                _kinv_col = 'PRICE'
-            if _kinv_col:
-                _kinv_vals = pd.to_numeric(kinray_all[_kinv_col], errors='coerce').fillna(0)
-                kinray_total_precomputed = float(_kinv_vals[_kinv_vals > 0].sum())
+            _kdf = kinray_all.copy()
+            _inv_col = next((c for c in _kdf.columns if 'invoice' in c.lower() and '$' in c), None)
+            if _inv_col:
+                _kdf[_inv_col] = pd.to_numeric(_kdf[_inv_col], errors='coerce').fillna(0)
+                kinray_total_precomputed = float(_kdf[_kdf[_inv_col] > 0][_inv_col].sum())
+            else:
+                kinray_total_precomputed = None
         except Exception:
-            pass
-        print(f"[DEBUG] Kinray total: ${kinray_total_precomputed:,.2f}")
+            kinray_total_precomputed = None
 
         add_summary_sheet(
             wb,

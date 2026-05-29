@@ -1,148 +1,12 @@
-# Builds "Never Ordered - Check" and "BIN to Processor" (including unmapped BINs) sheets.
+# Builds "BIN to Processor" (including unmapped BINs) sheet.
 
 import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, Side
-from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
-def _safe_display_index(display_columns, column_name, context):
-    if column_name not in display_columns:
-        print(f"[DEBUG] {context}: missing optional column '{column_name}'")
-        return None
-    return display_columns.index(column_name) + 1
-
-
-def create_never_ordered_check_sheet(wb, final_data):
-    """
-    Create 'Never Ordered - Check' sheet:
-      • Rows where Total Purchased == 0
-      • AND billed to insurance (any *_Q > 0 OR *_P > 0 OR *_T > 0)
-      • Shows base cols + all insurer Q/P/T columns (excluding ALL_PBM_*).
-    """
-
-    df = final_data.copy()
-
-    # Identify insurance bands
-    # q_cols = [c for c in df.columns if c.endswith('_Q')]
-    p_cols = [c for c in df.columns if c == 'ALL_PBM_P']
-    # t_cols = [c for c in df.columns if c.endswith('_T') and c != 'ALL_PBM_T']
-
-    # Ensure required base columns exist
-    for base in ['Drug Name', 'NDC #', 'Package Size', 'Total Purchased']:
-        if base not in df.columns:
-            df[base] = 0 if base != 'Drug Name' else pd.NA
-
-    # Coerce numeric for logic
-    def _to_num(cols):
-        if not cols:
-            return
-        df.loc[:, cols] = df[cols].apply(
-            pd.to_numeric, errors='coerce').fillna(0)
-
-    # _to_num(q_cols)
-    _to_num(p_cols)
-    # _to_num(t_cols)
-    df['Total Purchased'] = pd.to_numeric(
-        df['Total Purchased'], errors='coerce').fillna(0)
-
-    # "Billed to insurance" mask (any positive in Q/P/T)
-    billed_mask = pd.Series(False, index=df.index)
-    # if q_cols: billed_mask |= df[q_cols].gt(0).any(axis=1)
-    if p_cols:
-        billed_mask |= df[p_cols].gt(0).any(axis=1)
-    # if t_cols: billed_mask |= df[t_cols].gt(0).any(axis=1)
-
-    mask = (df['Total Purchased'] == 0) & billed_mask
-
-    # Build output
-    if 'Drug Type' not in df.columns:
-        df['Drug Type'] = 'Unclassified'
-    display_columns = (['Drug Name', 'NDC #', 'Package Size', 'Total Purchased']
-                       + p_cols + ['Drug Type'])
-    out = df.loc[mask, display_columns].copy()
-    out.rename(columns={'Package Size': 'Pkg Size'}, inplace=True)
-
-    # Create/replace sheet
-    title = "Never Ordered - Check"
-    if title in wb.sheetnames:
-        del wb[title]
-    ws = wb.create_sheet(title=title)
-
-    if out.empty:
-        ws['A1'] = "No rows with Total Purchased = 0 that were billed to insurance."
-        return
-
-    out = out.sort_values('Drug Name')
-    _num_cols = out.select_dtypes(include='number').columns
-    out[_num_cols] = out[_num_cols].round(2)
-
-    # Title row
-    ws.merge_cells(start_row=1, start_column=1,
-                   end_row=1, end_column=len(out.columns))
-    cell = ws.cell(row=1, column=1)
-    cell.value = "Never Ordered - Check (Billed to Insurance)"
-    cell.alignment = Alignment(horizontal='center', vertical='center')
-    cell.font = Font(size=20, bold=True)
-    ws.row_dimensions[1].height = 30
-
-    # Write table (headers at row 2, data from row 3)
-    for c_idx, col_name in enumerate(out.columns, start=1):
-        cell = ws.cell(row=2, column=c_idx, value=col_name)
-        cell.font = Font(bold=True, size=12)
-        rotate = col_name in (p_cols + ['Total Purchased', 'Pkg Size'])
-        cell.alignment = Alignment(horizontal='center', vertical='center',
-                                   text_rotation=(90 if rotate else 0), wrap_text=True)
-
-    for r_idx, row_data in enumerate(out.itertuples(index=False, name=None), start=3):
-        for c_idx, val in enumerate(row_data, start=1):
-            ws.cell(row=r_idx, column=c_idx, value=val)
-
-    # Header thick border
-    thick = Border(left=Side(style='thick'), right=Side(style='thick'),
-                   top=Side(style='thick'), bottom=Side(style='thick'))
-    for col_idx in range(1, len(out.columns) + 1):
-        ws.cell(row=2, column=col_idx).border = thick
-
-
-    # Column widths
-    widths = {
-        'Drug Name': 70,
-        'NDC #': 15,
-        'Pkg Size': 10,
-        'Total Purchased': 12
-    }
-    for idx, col_name in enumerate(out.columns, start=1):
-        col_letter = get_column_letter(idx)
-        ws.column_dimensions[col_letter].width = widths.get(col_name, 8)
-
-    # Rotate headers already done; set header row height
-    ws.row_dimensions[2].height = 80
-
-    # # Currency for *_T columns
-    # for tcol in t_cols:
-    #     if tcol in out.columns:
-    #         cidx = out.columns.get_loc(tcol) + 1
-    #         for r in range(3, ws.max_row + 1):
-    #             ws.cell(row=r, column=cidx).number_format = '"$"#,##0.00'
-
-    # Freeze panes
-    ws.freeze_panes = 'A3'
-    ws.auto_filter.ref = f"A2:{get_column_letter(len(display_columns))}{ws.max_row}"
-    last_row = ws.max_row
-    n_cols = len(out.columns)
-    tab = Table(displayName="TableNeverOrdered",
-                ref=f"A2:{get_column_letter(n_cols)}{last_row}")
-    tab.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium9", showRowStripes=True,
-        showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
-    ws.add_table(tab)
-    dt_idx = _safe_display_index(display_columns, 'Drug Type', "Never Ordered drug type width")
-    if dt_idx:
-        ws.column_dimensions[get_column_letter(dt_idx)].width = 14
-
-
-def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc):
+def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc,
+                                  dropped_status_counts=None,
+                                  total_csv_rows=None):
     # ===== Create/replace "BIN to Processor" sheet =====
     title_sheet = "BIN to Processor"
     if title_sheet in wb.sheetnames:
@@ -171,7 +35,7 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc):
                 return c
         return None
 
-    # --- Build BIN → Processor counts from the UNFILTERED custom log ---
+    # --- Build BIN -> Processor counts from the UNFILTERED custom log ---
     src_df = rx_compare_source.copy()  # unfiltered copy created earlier
     # Use the UNFILTERED log for totals so processor filters don't shrink the counts
 
@@ -179,7 +43,7 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc):
     COUNT_MODE = "rows"
 
     def build_rx_counts(src_df, mode="rows"):
-        # Normalize BIN; include NaN/blank → '000000'
+        # Normalize BIN; include NaN/blank -> '000000'
         bins = (src_df['Winning_BIN']
                 .astype('string')
                 .fillna('')                       # keep empties
@@ -239,6 +103,37 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc):
     ws2.cell(row=gt_row, column=3,
              value=f"=SUM(C3:C{gt_row-1})").font = Font(bold=True)
 
+    # === Dropped RX summary ===
+    if dropped_status_counts:
+        # Blank separator row
+        gap_row = ws2.max_row + 2
+
+        # Section header
+        ws2.merge_cells(start_row=gap_row, start_column=1,
+                        end_row=gap_row, end_column=3)
+        hdr = ws2.cell(row=gap_row, column=1,
+                       value="Dropped RX (excluded from report)")
+        hdr.font = Font(bold=True, size=12, color="FF0000")
+        hdr.alignment = Alignment(horizontal='left', vertical='center')
+
+        r = gap_row + 1
+        total_dropped = 0
+        for status, count in sorted(dropped_status_counts.items()):
+            ws2.cell(row=r, column=1, value=status).font = Font(bold=False)
+            ws2.cell(row=r, column=2, value=count).font = Font(bold=False)
+            total_dropped += count
+            r += 1
+
+        # Total dropped row
+        ws2.cell(row=r, column=1, value="Total Dropped").font = Font(bold=True)
+        ws2.cell(row=r, column=2, value=total_dropped).font = Font(bold=True)
+        r += 1
+
+        # Total CSV rows
+        if total_csv_rows:
+            ws2.cell(row=r, column=1, value="Total CSV Rows").font = Font(bold=True)
+            ws2.cell(row=r, column=2, value=total_csv_rows).font = Font(bold=True)
+
     # Widths / filter
     ws2.column_dimensions['A'].width = 12
     ws2.column_dimensions['B'].width = 28
@@ -263,23 +158,29 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc):
     unmapped_rows = src_norm[src_norm['__BIN'] == '000000'].copy()
     fill_col = find_fill_date_column(unmapped_rows)
 
-    ws2.merge_cells('F1:H1')
+    ws2.merge_cells('F1:L1')
     title = ws2.cell(row=1, column=6, value="Unmapped BIN Numbers (000000)")
     title.alignment = Alignment(horizontal="center", vertical="center")
     title.font = Font(bold=True, size=14)
     ws2['F2'] = "BIN"
     ws2['G2'] = "RX #"
-    if fill_col:
-        ws2['H2'] = "Fill Date"
+    ws2['H2'] = "Fill Date"
+    ws2['I2'] = "Plan 1 Name"
+    ws2['J2'] = "Ins Paid Plan 1"
+    ws2['K2'] = "Plan 2 Name"
+    ws2['L2'] = "Ins Paid Plan 2"
 
     # Style + widths
-    for col in ['F', 'G'] + (['H'] if fill_col else []):
+    for col in ['F', 'G', 'H', 'I', 'J', 'K', 'L']:
         head = ws2[f'{col}2']
         head.font = Font(bold=True, color="000000")
         head.alignment = Alignment(horizontal="center", vertical="center")
         ws2.column_dimensions[col].width = 18
-    if fill_col:
-        ws2.column_dimensions['H'].width = 14
+    ws2.column_dimensions['H'].width = 14
+    ws2.column_dimensions['I'].width = 25
+    ws2.column_dimensions['J'].width = 18
+    ws2.column_dimensions['K'].width = 25
+    ws2.column_dimensions['L'].width = 18
 
     # Coerce date (for pretty output); safe even if mixed types
     if fill_col:
@@ -289,24 +190,41 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc):
         except Exception:
             pass
 
-   # Write ALL rows (no set()/groupby dedupe): F=BIN, G=RX #, H=Fill Date
+    # Normalize numeric columns safely
+    for pay_col in ['Ins Paid Plan 1', 'Ins Paid Plan 2']:
+        if pay_col in unmapped_rows.columns:
+            unmapped_rows[pay_col] = pd.to_numeric(
+                unmapped_rows[pay_col], errors='coerce').fillna(0).round(2)
+
+    # Write ALL rows (no set()/groupby dedupe): F=BIN, G=RX #, H=Fill Date
     start_row_unmapped = 3
-    cols = ['__BIN', 'Rx #'] + ([fill_col] if fill_col else [])
-    for r_idx, row in enumerate(unmapped_rows[cols].itertuples(index=False, name=None),
-                                start=start_row_unmapped):
+    optional_unmapped_cols = [
+        (8, fill_col),
+        (9, 'Plan 1 Name'),
+        (10, 'Ins Paid Plan 1'),
+        (11, 'Plan 2 Name'),
+        (12, 'Ins Paid Plan 2'),
+    ]
+    optional_unmapped_cols = [
+        (col_idx, col_name) for col_idx, col_name in optional_unmapped_cols
+        if col_name and col_name in unmapped_rows.columns
+    ]
+    cols = ['__BIN', 'Rx #'] + [col_name for _, col_name in optional_unmapped_cols]
+
+    for r_idx, row in enumerate(
+            unmapped_rows[cols].itertuples(index=False, name=None),
+            start=start_row_unmapped):
         # F -> BIN (000000)
         ws2.cell(row=r_idx, column=6, value=row[0])
         ws2.cell(row=r_idx, column=7, value=str(row[1]))          # G -> RX #
-        if fill_col:
-            v = row[2]
+        for (col_idx, col_name), v in zip(optional_unmapped_cols, row[2:]):
             # format Timestamp nicely
-            if hasattr(v, "strftime"):
+            if col_name == fill_col and hasattr(v, "strftime"):
                 v = v.strftime('%Y-%m-%d')
-            # H -> Fill Date
-            ws2.cell(row=r_idx, column=8, value=v)
+            ws2.cell(row=r_idx, column=col_idx, value=v)
 
-    # Filter across A..H if H exists; else A..G
-    last_col_letter = 'H' if fill_col else 'G'
+    # Filter across all populated table and unmapped columns.
+    last_col_letter = 'L'
     ws2.auto_filter.ref = f"A2:{last_col_letter}{ws2.max_row}"
 
     # ---- Formatting
@@ -314,4 +232,4 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc):
     ws2.column_dimensions['B'].width = 30
     ws2.column_dimensions['C'].width = 10
     ws2.freeze_panes = 'A3'  # keep title+headers fixed
-    ws2.auto_filter.ref = f"A2:B{ws2.max_row}"  # filter on BIN/Processor only
+    ws2.auto_filter.ref = f"A2:L{ws2.max_row}"

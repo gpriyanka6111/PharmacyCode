@@ -125,18 +125,6 @@ def apply_common_sheet_settings(
             "min_row_for_height": 3,
             "orientation": "portrait",
         },
-        "Never Ordered - Check": {
-            "title": "{pharmacy} ({range}) - Never Ordered Package - Check",
-            "font_size": 25,
-            "min_row_for_height": 3,
-            "orientation": "landscape",
-        },
-        "Never Ordered  - Check": {  # tolerate double-space variant
-            "title": "{pharmacy} ({range}) - Never Ordered Package - Check",
-            "font_size": 25,
-            "min_row_for_height": 3,
-            "orientation": "landscape",
-        },
     }
 
     # Apply per-sheet render + common print settings

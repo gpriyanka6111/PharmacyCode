@@ -51,7 +51,6 @@ def add_summary_sheet(
     rx_compare_df=None,
     needs_df=None,
     dno_df=None,
-    never_df=None,
 ):
     if "Summary" in wb.sheetnames:
         del wb["Summary"]
@@ -97,7 +96,10 @@ def add_summary_sheet(
     if log_df is not None:
         try:
             total_rx = len(log_df)
-            if 'Winning_Paid' in log_df.columns:
+            if 'Ins Paid Total' in log_df.columns:
+                insurance_paid = float(
+                    pd.to_numeric(log_df['Ins Paid Total'], errors='coerce').fillna(0).sum())
+            elif 'Winning_Paid' in log_df.columns:
                 insurance_paid = float(
                     pd.to_numeric(log_df['Winning_Paid'], errors='coerce').fillna(0).sum())
             elif 'Ins Paid Plan 1' in log_df.columns:
@@ -111,16 +113,13 @@ def add_summary_sheet(
         except Exception:
             pass
 
-    # Use pre-computed total if passed (matches vendor_parser logic exactly).
-    # Fall back to summing kinray_df only if not provided.
+    # Use pre-computed total passed from pipeline — most reliable source
     if kinray_total is not None:
-        kinray_bill = kinray_total
-    else:
+        kinray_bill = float(kinray_total)
+    elif kinray_df is not None:
         try:
             _inv_col = next((c for c in kinray_df.columns
-                            if 'invoice' in c.lower() and '$' in c), None) if kinray_df is not None else None
-            if _inv_col is None and kinray_df is not None:
-                _inv_col = 'PRICE' if 'PRICE' in kinray_df.columns else None
+                            if 'invoice' in c.lower() and '$' in c), None)
             if _inv_col:
                 _vals = pd.to_numeric(kinray_df[_inv_col], errors='coerce').fillna(0)
                 kinray_bill = float(_vals[_vals > 0].sum())
@@ -170,7 +169,6 @@ def add_summary_sheet(
 
     needs_order_count    = len(needs_df) if needs_df is not None else _count_sheet_rows("Needs to be ordered - All")
     do_not_order_count   = len(dno_df)   if dno_df   is not None else _count_sheet_rows("Do Not Order - ALL")
-    never_purchased_count = len(never_df) if never_df is not None else _count_sheet_rows("Never Ordered - Check")
 
     section_header(ws, 10, 1, 8, "Order Analysis")
     ws.row_dimensions[10].height = 22
@@ -178,15 +176,14 @@ def add_summary_sheet(
     order_cards = [
         ("Needs to be Ordered", needs_order_count,     FILL_AMBER,  TEXT_AMBER),
         ("Do Not Order",        do_not_order_count,    FILL_RED,    TEXT_RED),
-        ("Never Purchased",     never_purchased_count, FILL_PURPLE, TEXT_PURPLE),
     ]
     for i, (label, value, fill, text) in enumerate(order_cards):
         cs, ce = i * 2 + 1, i * 2 + 2
         ws.merge_cells(start_row=11, start_column=cs, end_row=11, end_column=ce)
         filled_cell(ws, 11, cs, label, fill, TEXT_MUTED, size=9)
         ws.merge_cells(start_row=12, start_column=cs, end_row=12, end_column=ce)
-        vc = filled_cell(ws, 12, cs, value, fill, text, bold=True, size=14)
-        vc.number_format = count_fmt
+        vc = filled_cell(ws, 12, cs, f"{value:,} Drugs", fill, text, bold=True, size=14)
+        vc.number_format = '@'  # text format since we're using string
     ws.row_dimensions[11].height = 18
     ws.row_dimensions[12].height = 28
     ws.row_dimensions[13].height = 4
@@ -263,8 +260,8 @@ def add_summary_sheet(
         ws.merge_cells(start_row=16, start_column=cs, end_row=16, end_column=ce)
         filled_cell(ws, 16, cs, label, fill, TEXT_MUTED, size=9)
         ws.merge_cells(start_row=17, start_column=cs, end_row=17, end_column=ce)
-        vc = filled_cell(ws, 17, cs, value, fill, text, bold=True, size=14)
-        vc.number_format = fmt
+        vc = filled_cell(ws, 17, cs, f"{value:,} RX", fill, text, bold=True, size=14)
+        vc.number_format = '@'
     ws.row_dimensions[16].height = 18
     ws.row_dimensions[17].height = 28
 
@@ -290,8 +287,8 @@ def add_summary_sheet(
         ws.merge_cells(start_row=20, start_column=cs, end_row=20, end_column=ce)
         filled_cell(ws, 20, cs, label, fill, TEXT_MUTED, size=9)
         ws.merge_cells(start_row=21, start_column=cs, end_row=21, end_column=ce)
-        vc = filled_cell(ws, 21, cs, value, fill, text, bold=True, size=14)
-        vc.number_format = count_fmt
+        vc = filled_cell(ws, 21, cs, f"{value:,} RX", fill, text, bold=True, size=14)
+        vc.number_format = '@'
     ws.row_dimensions[20].height = 18
     ws.row_dimensions[21].height = 28
 
@@ -351,6 +348,9 @@ def add_summary_sheet(
 
                 never_mask = ~kdf_agg['NDC_norm'].isin(billed_ndcs)
 
+                # Filter out invalid NDCs (all zeros = null/blank NDC)
+                valid_ndc_mask = kdf_agg['NDC_norm'].str.replace('0', '').str.len() > 0
+
                 if 'TYPE' in kdf_agg.columns:
                     type_s       = kdf_agg['TYPE'].astype(str).str.upper()
                     brand_mask   = type_s.str.contains(r'BRAND|^B$|^BR$',     na=False, regex=True)
@@ -359,15 +359,24 @@ def add_summary_sheet(
                     brand_mask   = pd.Series(False, index=kdf_agg.index)
                     generic_mask = pd.Series(False, index=kdf_agg.index)
 
-                never_billed_brand_df   = kdf_agg[brand_mask   & never_mask].copy()
-                never_billed_generic_df = kdf_agg[generic_mask & never_mask].copy()
+                never_billed_brand_df   = kdf_agg[brand_mask   & never_mask & valid_ndc_mask].copy()
+                never_billed_generic_df = kdf_agg[generic_mask & never_mask & valid_ndc_mask].copy()
 
                 # Enrich brand table with drug names and pkg sizes where possible
                 drug_name_map = {}
+                # First try log_df Drug Name
                 if 'Drug Name' in log_df.columns:
                     drug_name_map = dict(zip(
                         log_df['NDC #'].astype(str).str.replace(r'\D', '', regex=True).str.zfill(11),
                         log_df['Drug Name'].astype(str)
+                    ))
+                # Also build from Kinray Description column as fallback
+                kinray_name_map = {}
+                _desc_col = next((c for c in kdf.columns if c.strip().lower() == 'description'), None)
+                if _desc_col:
+                    kinray_name_map = dict(zip(
+                        kdf['NDC_norm'].astype(str),
+                        kdf[_desc_col].astype(str)
                     ))
                 pkg_size_map = {}
                 if final_data is not None and 'NDC #' in final_data.columns and 'Package Size' in final_data.columns:
@@ -375,11 +384,26 @@ def add_summary_sheet(
                         final_data['NDC #'].astype(str).str.replace(r'\D', '', regex=True).str.zfill(11),
                         pd.to_numeric(final_data['Package Size'], errors='coerce')
                     ))
+                # Also build from Kinray Size column as fallback
+                kinray_size_map = {}
+                _size_col = next((c for c in kdf.columns if c.strip().lower() == 'size'), None)
+                if _size_col:
+                    kinray_size_map = dict(zip(
+                        kdf['NDC_norm'].astype(str),
+                        pd.to_numeric(kdf[_size_col], errors='coerce')
+                    ))
 
                 never_billed_brand_df['Drug Name'] = (
-                    never_billed_brand_df['NDC_norm'].map(drug_name_map).fillna(''))
+                    never_billed_brand_df['NDC_norm']
+                    .map(drug_name_map)
+                    .fillna(never_billed_brand_df['NDC_norm'].map(kinray_name_map))
+                    .fillna('')
+                )
                 never_billed_brand_df['Pkg Size'] = (
-                    never_billed_brand_df['NDC_norm'].map(pkg_size_map))
+                    never_billed_brand_df['NDC_norm']
+                    .map(pkg_size_map)
+                    .fillna(never_billed_brand_df['NDC_norm'].map(kinray_size_map))
+                )
                 never_billed_brand_df['NDC'] = never_billed_brand_df['NDC_norm']
 
                 brand_count   = len(never_billed_brand_df)
@@ -512,7 +536,9 @@ def add_summary_sheet(
     alt_proc_fills = ["FFFFFF", "F0F6FF"]
 
     for p_idx, proc in enumerate(processors or []):
-        fill_hex   = alt_proc_fills[p_idx % 2]
+        fill_hex = "0F4C81" if proc == 'ALL_PBM' else alt_proc_fills[p_idx % 2]
+        font_color = "FFFFFF" if proc == 'ALL_PBM' else TEXT_DARK
+        is_allpbm = proc == 'ALL_PBM'
         ins = pur = net = needs_est = 0.0
         if final_data is not None:
             try:
@@ -537,7 +563,7 @@ def add_summary_sheet(
         for ci, val in enumerate(row_vals, start=1):
             c = ws.cell(row=current_row, column=ci, value=val)
             c.fill      = PatternFill("solid", fgColor=fill_hex)
-            c.font      = Font(size=10)
+            c.font      = Font(size=10, bold=is_allpbm, color=font_color)
             c.alignment = Alignment(
                 horizontal='left' if ci == 1 else 'center',
                 vertical='center'
@@ -545,10 +571,12 @@ def add_summary_sheet(
             if ci > 1:
                 c.number_format = money_fmt
         ws.row_dimensions[current_row].height = 18
-        totals[0] += ins
-        totals[1] += pur
-        totals[2] += net
-        totals[3] += needs_est
+        # Exclude ALL_PBM from totals — it's the aggregate of all processors
+        if proc != 'ALL_PBM':
+            totals[0] += ins
+            totals[1] += pur
+            totals[2] += net
+            totals[3] += needs_est
         current_row += 1
 
     # Total row

@@ -60,7 +60,6 @@ The generated Excel file includes:
 Sheets generated:
 - Needs to be Ordered – identifies shortages
 - Do Not Order – identifies excess inventory
-- Never Ordered – billed but not purchased drugs
 - Insurance from BIN Master – mapped insurance data
 
 ---

@@ -4,14 +4,19 @@ from openpyxl.formatting.rule import CellIsRule, FormulaRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter, range_boundaries
 from openpyxl.worksheet.page import PageMargins
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from excel.support_sheets import create_bin_to_processor_sheet
 
 
 def build_processed_data_sheet(wb, ws, final, desired_columns, processors,
                                 pharmacy_name, date_range,
-                                rx_compare_source, bin_to_proc):
+                                rx_compare_source, bin_to_proc,
+                                dropped_status_counts=None,
+                                total_csv_rows=None):
     header_row = 3
+    ws.sheet_view.showGridLines = True
+    ws.print_options.gridLines = True
 
     # Merge the first row and set the pharmacy name and date range in the center
     ws.merge_cells(start_row=1, start_column=1, end_row=1,
@@ -204,6 +209,15 @@ def build_processed_data_sheet(wb, ws, final, desired_columns, processors,
         pkg_cell.font = Font(bold=False, size=14, name='Calibri')
 
     ws.row_dimensions[3].height = 100
+
+    # Column-level defaults for data rows; explicit header alignment is preserved.
+    ws.column_dimensions['C'].alignment = Alignment(
+        horizontal='left', vertical='center')
+    for col_idx in range(4, ws.max_column + 1):
+        col_letter = get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].alignment = Alignment(
+            horizontal='center', vertical='center')
+
     # Freeze the first row
     # ws.freeze_panes = 'A4'
     # freeze panes till kinray unit price column
@@ -262,11 +276,9 @@ def build_processed_data_sheet(wb, ws, final, desired_columns, processors,
                         stopIfTrue=False, fill=row_fill_soft)
         )
 
-    # AutoFilter over the full data region (row 3 headers)
-    ws.auto_filter.ref = f"A{header_row}:{get_column_letter(ws.max_column)}{data_last_row}"
+    # AutoFilter managed by Table below
 
-    # Note: per-cell alignment on 54k rows is too slow.
-    # Center alignment is the Excel default; left-align cols A/B via column style only.
+    # Alignment handled by xlsxwriter column defaults in pipeline.py
 
     def apply_thick_border(ws, start_col, end_col, start_row, end_row):
         # Top edge
@@ -291,11 +303,6 @@ def build_processed_data_sheet(wb, ws, final, desired_columns, processors,
                                  left=cell.border.left, bottom=cell.border.bottom)
     start_row = 1
     end_row = ws.max_row
-
-    def style_sheet(ws):
-        for row in ws.iter_rows(min_row=1, max_row=ws.max_row):
-            for cell in row:
-                cell.border = thin_border
 
     def get_column_indices(ws, column_names):
         indices = []
@@ -395,5 +402,26 @@ def build_processed_data_sheet(wb, ws, final, desired_columns, processors,
 
     # Set the title of the active worksheet
     ws.title = "Processed Data"
+
+    # ── Thin borders via Excel Table (zero performance cost) ──
+    _last_row = ws.max_row
+    _last_col = ws.max_column
+    # Remove auto_filter first — Table manages its own filter
+    ws.auto_filter.ref = None
+    _tab = Table(
+        displayName="TableProcessedData",
+        ref=f"A3:{get_column_letter(_last_col)}{_last_row}"
+    )
+    _tab.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium9",
+        showRowStripes=True,
+        showFirstColumn=False,
+        showLastColumn=False,
+        showColumnStripes=False
+    )
+    ws.add_table(_tab)
+
     # ws.protection.sheet = True
-    create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc)
+    create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc,
+                                  dropped_status_counts=dropped_status_counts,
+                                  total_csv_rows=total_csv_rows)

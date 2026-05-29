@@ -50,7 +50,7 @@ def generate_master_audit_workbook(final_df, pharmacy_name, date_range, output_d
     # Safe filename & sheet names
     safe_pharmacy = re.sub(r'[^A-Za-z0-9()._\-\s]+', '_', str(pharmacy_name)).strip()
     safe_range    = re.sub(r'[^A-Za-z0-9()._\-\s]+', '_', str(date_range)).strip()
-    filename      = f"{safe_pharmacy}_Audit_{safe_range}.xlsx"
+    filename      = f"{safe_pharmacy}_Reference ({safe_range}).xlsx"
     filepath      = os.path.join(output_dir, filename)
 
     def safe_sheet_name(name: str) -> str:

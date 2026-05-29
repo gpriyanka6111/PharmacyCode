@@ -14,11 +14,12 @@ def _normalize_status_value(v):
 def _filter_custom_log_transmitted_paid_ins(df):
     """
     Keep only rows whose status is Transmitted or Paid-Ins.
-    Returns (filtered_df, status_col_name, kept_rows, dropped_rows).
+    Returns (filtered_df, status_col_name, kept_rows, dropped_rows,
+    dropped_status_counts).
     Raises ValueError if a usable status column cannot be identified.
     """
     if df is None or df.empty:
-        return df.copy(), None, 0, 0
+        return df.copy(), None, 0, 0, {}
 
     col_lookup = {str(c).strip().lower(): c for c in df.columns}
     preferred = [
@@ -54,7 +55,15 @@ def _filter_custom_log_transmitted_paid_ins(df):
     mask = status_norm.isin(allowed)
     kept = int(mask.sum())
     dropped = int((~mask).sum())
-    return df.loc[mask].copy(), status_col, kept, dropped
+    dropped_df = df.loc[~mask]
+    dropped_status_counts = (
+        dropped_df[status_col]
+        .astype(str).str.strip()
+        .value_counts()
+        .to_dict()
+    ) if not dropped_df.empty else {}
+
+    return df.loc[mask].copy(), status_col, kept, dropped, dropped_status_counts
 
 
 def _build_insurance_summary(log_df, bin_df):

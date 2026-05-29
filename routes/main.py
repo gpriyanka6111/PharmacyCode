@@ -73,6 +73,12 @@ def index():
 
 @bp.route('/upload', methods=['POST'])
 def upload_file():
+    print("\n===== UPLOAD DEBUG =====")
+    print("FORM KEYS:", list(request.form.keys()))
+    print("FILES KEYS:", list(request.files.keys()))
+    print("FORM DATA:", request.form.to_dict())
+    print("========================\n")
+
     pharmacy_name = (request.form.get('pharmacy_name') or '').strip()
     date_range = (request.form.get('date_range') or '').strip()
 
@@ -143,8 +149,11 @@ def upload_file():
     try:
         # ---- Build summary for review (processors, total Rx, $ by processor) ----
         log_df = pd.read_csv(custom_log_path, dtype=str)
-        log_df, _status_col, _kept_rows, _dropped_rows = _filter_custom_log_transmitted_paid_ins(log_df)
-        _log_df_for_cache = log_df.copy()
+        filter_result = _filter_custom_log_transmitted_paid_ins(log_df)
+        log_df = filter_result[0]
+        _status_col = filter_result[1] if len(filter_result) > 1 else None
+        _kept_rows = filter_result[2] if len(filter_result) > 2 else None
+        _dropped_rows = filter_result[3] if len(filter_result) > 3 else None
         bin_df = pd.read_csv(bin_master_path, dtype=str)
         # Normalize BIN columns
         for col in ['Plan 1 BIN', 'Plan 2 BIN']:
@@ -161,11 +170,11 @@ def upload_file():
                 ).fillna(0)
 
         # Choose winning BIN and paid per row
-        log_df['Winning_BIN'] = np.where(
-            log_df['Ins Paid Plan 1'] >= log_df['Ins Paid Plan 2'],
-            log_df['Plan 1 BIN'], log_df['Plan 2 BIN']
-        )
-        log_df['Winning_BIN'] = log_df['Winning_BIN'].astype(str).str.zfill(6)
+        log_df['Winning_BIN'] = log_df.apply(
+            lambda r: r['Plan 1 BIN']
+            if r['Ins Paid Plan 1'] >= r['Ins Paid Plan 2']
+            else r['Plan 2 BIN'], axis=1
+        ).str.zfill(6)
 
         log_df['Winning_Paid'] = np.where(
             log_df['Winning_BIN'] == log_df['Plan 1 BIN'],
@@ -280,7 +289,6 @@ def upload_file():
             "Processed Data",
             "Needs to be ordered - All",
             "Do Not Order - ALL",
-            "Never Ordered - Check",
             "Refills 0 - Call Doctor",
             "RX Comparison - All",
             "RX Comparison +ve",
@@ -294,7 +302,6 @@ def upload_file():
             "Processed Data",
             "Needs to be ordered - All",
             "Do Not Order - ALL",
-            "Never Ordered - Check",
             "Refills 0 - Call Doctor",
             "MFP Drugs - RX",
             "Missed Refill - Revenue Recovery",
@@ -454,9 +461,7 @@ def upload_file():
             },
             "pharmacy_name": pharmacy_name,
             "date_range": date_range,
-            "summary": summary,
-            "_cached_log_df": _log_df_for_cache.to_dict('records'),
-            "_cached_kinray_df": kinray_clean.to_dict('records'),
+            "summary": summary
         }
 
         return jsonify({
@@ -465,6 +470,13 @@ def upload_file():
             "summary": summary
         })
     except Exception as e:
+        import traceback
+        print("\n" + "=" * 80)
+        print("UPLOAD ERROR")
+        print("=" * 80)
+        traceback.print_exc()
+        print("=" * 80 + "\n")
+
         return jsonify({
             'success': False,
             'error': 'Upload failed',
@@ -613,8 +625,6 @@ def finalize_job():
         # include Kinray first, then the extras
         vendor_paths = [paths["kinray"], *paths["vendors"]]
 
-        cached_log = ctx.get('_cached_log_df')
-        cached_kinray = ctx.get('_cached_kinray_df')
         result = process_custom_log_data(
             custom_log_path=paths["custom_log"],
             all_pbm_path=paths["all_pbm"],
@@ -625,8 +635,6 @@ def finalize_job():
             selected_processors=selected_processors,
             selected_sheets=selected_sheets,
             user_audit_dir=audit_save_dir,
-            cached_log_df=cached_log,
-            cached_kinray_df=cached_kinray,
         )
         if not result or not isinstance(result, dict):
             return jsonify({"ok": False, "error": "Report generation returned no filename"}), 500
@@ -741,7 +749,6 @@ def finalize_job():
             "main_filename": main_name,
             "main_download_url": f"/download?filename={quote(main_name)}",
             "download_url": f"/download?filename={quote(main_name)}",  # backwards-compatible
-            "dashboard_url": f"/dashboard?job_id={job_id}"
         }
         if audit_name and ctx.get("outfile_audit"):
             resp.update({
@@ -781,18 +788,6 @@ def dashboard():
     except Exception:
         log_df = pd.DataFrame()
     total_rx = len(log_df) or ctx.get('summary', {}).get('total_rx', 0)
-
-    # RX comparison summary stats — computed from in-memory log, no file reads
-    underpaid_count = 0
-    underpaid_total = 0.0
-    try:
-        if 'Difference' in log_df.columns:
-            neg = pd.to_numeric(log_df['Difference'], errors='coerce').fillna(0)
-            underpaid_count = int((neg < 0).sum())
-            underpaid_total = abs(float(neg[neg < 0].sum()))
-    except Exception:
-        pass
-    main_filename = os.path.basename(ctx.get('outfile_main', '') or '')
 
     top_doctors = []
     if 'Prescriber NPI #' in log_df.columns:
@@ -855,7 +850,7 @@ def dashboard():
         for key, sheet_name in {
             'needs_ordering': 'Needs to be ordered - All',
             'do_not_order': 'Do Not Order - ALL',
-            'never_purchased': 'Never Ordered - Check',
+            'rx_comparison': 'RX Comparison - All',
         }.items():
             try:
                 df = pd.read_excel(
@@ -988,29 +983,18 @@ def dashboard():
     except Exception as e:
         print(f'[DEBUG] Insight 3: {e}')
 
-    # 4. Rx comparison summary (no longer reads Excel — uses in-memory stats)
+    # 4. Underpayments from Rx comparison
     try:
-        total_rx_val = summary.get('total_rx', 0)
-        if total_rx_val > 0:
+        rx_count = excel_data.get('rx_comparison', {}).get('count', 0)
+        if rx_count > 0:
             key_insights.append({
-                'type': 'amber' if underpaid_count > 0 else 'green',
-                'title': f"{total_rx_val:,} Rx analyzed — {underpaid_count} underpaid",
-                'sub': 'Download the Excel report to view full RX Comparison sheet'
+                'type': 'amber',
+                'title': f"{rx_count} Rx comparisons analyzed",
+                'sub': 'Check Rx comparison sheet for underpayments eligible for dispute'
             })
     except Exception as e:
         print(f'[DEBUG] Insight 4: {e}')
 
-    # 5. Never purchased drugs
-    try:
-        never_count = excel_data.get('never_purchased', {}).get('count', 0)
-        if never_count > 0:
-            key_insights.append({
-                'type': 'amber',
-                'title': f"{never_count} drugs billed but never purchased",
-                'sub': 'Possible data entry errors — investigate'
-            })
-    except Exception as e:
-        print(f'[DEBUG] Insight 5: {e}')
 
     # 6. Overstocked drugs
     try:
@@ -1062,10 +1046,7 @@ def dashboard():
         excel_data=excel_data,
         top_discrepancies=top_discrepancies,
         job_id=job_id,
-        key_insights=key_insights,
-        main_filename=main_filename,
-        underpaid_count=underpaid_count,
-        underpaid_total=underpaid_total,
+        key_insights=key_insights
     )
 
 
@@ -1148,7 +1129,6 @@ def sheet_data():
     sheet_map = {
         'do_not_order':    'Do Not Order - ALL',
         'needs_ordering':  'Needs to be ordered - All',
-        'never_purchased': 'Never Ordered - Check',
         'rx_comparison':   'RX Comparison - All',
     }
     sheet_name = sheet_map.get(sheet)
@@ -1207,7 +1187,6 @@ def export_excel(sheet_key):
     sheet_map = {
         'do_not_order':    'Do Not Order - ALL',
         'needs_ordering':  'Needs to be ordered - All',
-        'never_purchased': 'Never Ordered - Check',
         'rx_comparison':   'RX Comparison - All',
     }
     sheet_name = sheet_map.get(sheet_key)
@@ -1457,8 +1436,8 @@ def sheet_needs_ordering():
     )
 
 
-@bp.route('/sheet/never_purchased')
-def sheet_never_purchased():
+@bp.route('/sheet/rx_comparison')
+def sheet_rx_comparison():
     job_id = request.args.get('job_id', '')
     ctx = _JOB_CACHE.get(job_id)
     if not ctx:
@@ -1475,7 +1454,7 @@ def sheet_never_purchased():
         try:
             df = pd.read_excel(
                 main_file,
-                sheet_name='Never Ordered - Check',
+                sheet_name='RX Comparison - All',
                 dtype=str,
                 header=1
             )
@@ -1486,36 +1465,32 @@ def sheet_never_purchased():
                 'rows': df.head(100).values.tolist()
             }
         except Exception as e:
-            print(f'[DEBUG] Never purchased sheet error: {e}')
+            print(f'[DEBUG] RX Comparison sheet error: {e}')
 
     return render_template(
         'sheet_view.html',
         job_id=job_id,
         pharmacy_name=ctx.get('pharmacy_name', ''),
         date_range=ctx.get('date_range', ''),
-        sheet_key='never_purchased',
-        sheet_title='Never purchased — investigate',
+        sheet_key='rx_comparison',
+        sheet_title='Rx comparison — underpayment analysis',
         sheet_count=sheet_data['count'],
-        sheet_badge_color='#FAEEDA',
-        sheet_badge_text_color='#854F0B',
-        sheet_accent_color='#854F0B',
-        sheet_export_bg='#854F0B',
+        sheet_badge_color='#E6F1FB',
+        sheet_badge_text_color='#185FA5',
+        sheet_accent_color='#185FA5',
+        sheet_export_bg='#185FA5',
         columns=sheet_data['columns'],
         rows=sheet_data['rows'],
-        severity_col='Never Ordered',
-        high_label='Critical >10',
-        med_label='Medium 5-10',
-        low_label='Low <5',
+        severity_col='Difference',
+        high_label='Underpaid >$10',
+        med_label='Underpaid $5-$10',
+        low_label='Underpaid <$5',
         high_color='#E24B4A',
         med_color='#EF9F27',
         low_color='#639922',
         drug_types=[],
         stat_labels=None,
     )
-
-
-# /sheet/rx_comparison removed — full table view caused 4+ min load for 54k rows.
-# RX Comparison data is still generated in the Excel file; use the download button.
 
 
 @bp.route('/load_report/<filename>')

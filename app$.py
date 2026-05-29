@@ -60,9 +60,8 @@ from processing.vendor_parser import parse_vendor_files
 from excel.formatting import (get_column_index, discover_processors_from_df,
                                apply_common_sheet_settings, set_print_area_excluding_headers)
 from excel.order_sheets import add_max_difference_sheet, min_difference_sheet
-from excel.support_sheets import create_never_ordered_check_sheet, create_bin_to_processor_sheet
+from excel.support_sheets import create_bin_to_processor_sheet
 from excel.rx_comparison_sheets import (add_rx_unit_compare_sheet_exact,
-                                        add_rx_unit_compare_sheet_exact_pos,
                                         add_mfp_drugs_sheet)
 from excel.refill_sheets import add_zero_refills_sheet
 from excel.summary_sheet import add_summary_sheet

@@ -450,14 +450,6 @@
           <div class="alert-link">View order list</div>
         </div>
       </div>
-      <div class="col-6 col-md-4">
-        <div class="alert-card amber h-100" onclick="window.location.href='/sheet/never_purchased?job_id={{ job_id }}'" style="cursor:pointer">
-          <div class="alert-num">{{ excel_data.never_purchased.count | default(0) }}</div>
-          <div class="alert-title">Never purchased &mdash; check</div>
-          <div class="alert-sub">$12,300 at risk</div>
-          <div class="alert-link">Investigate now</div>
-        </div>
-      </div>
       <div class="col-12 col-md-4">
         <div class="alert-card green h-100" onclick="window.location='/sheet/do_not_order?job_id={{ job_id }}'" style="cursor:pointer">
           <div class="alert-num">{{ excel_data.do_not_order.count | default(0) }}</div>
