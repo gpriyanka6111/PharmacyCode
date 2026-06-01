@@ -82,17 +82,19 @@ def parse_vendor_files(vendor_paths):
         ourcase_col = _pick(lower_to_orig, ['ourcase', 'our case', 'case',
                                             'invoice #', 'invoice number', 'inv #',
                                             'document number', 'doc #', 'doc no'])
-        # # 🔹 NEW: optional drug-name column
-        # drug_col = _pick(lower_to_orig, [
-        #     'drug name', 'item description', 'description',
-        #     'product name', 'item name','Description'
-        # ])
-
+        # Optional drug-name column
+        drug_col = _pick(lower_to_orig, [
+            'drug name', 'item description', 'description',
+            'product name', 'item name', 'Description'
+        ])
+        size_col = _pick(lower_to_orig, ['size', 'pkg size', 'package size', 'pack size'])
 
         keep_cols = [ndc_col, ship_col, price_col] \
-            + ([date_col] if date_col else []) \
+            + ([date_col]    if date_col    else []) \
             + ([ourcase_col] if ourcase_col else []) \
-            + ([type_col] if type_col else [])
+            + ([type_col]    if type_col    else []) \
+            + ([drug_col]    if drug_col    else []) \
+            + ([size_col]    if size_col    else [])
 
         v = raw[keep_cols].copy()
 
@@ -104,11 +106,13 @@ def parse_vendor_files(vendor_paths):
             rename_map[ourcase_col] = 'OURCASE'
         if type_col:
             rename_map[type_col] = 'TYPE'
+        if drug_col:
+            rename_map[drug_col] = 'Drug Name'
+        if size_col:
+            rename_map[size_col] = 'Pkg Size'
         v.rename(columns=rename_map, inplace=True)
         if 'TYPE' in v.columns:
             v['TYPE'] = v['TYPE'].astype(str).str.strip().str.upper()
-        # if drug_col:
-        #     rename_map[drug_col] = 'Drug Name'   # 🔹 NEW
         # DATE
         if 'DATE' in v.columns:
             v['DATE'] = pd.to_datetime(v['DATE'], errors='coerce')
@@ -166,18 +170,15 @@ def parse_vendor_files(vendor_paths):
         # Row-level unit price (only where Shipped > 0)
         v['__UnitPrice__'] = np.where(
             v['Shipped'] > 0,
-            np.round(v['PRICE'] / v['Shipped'], 2),  # keep as float first
+            v['PRICE'] / v['Shipped'],
             np.nan
         )
-
-        # remove infinities (e.g., division by 0)
-        v['__UnitPrice__'] = np.where(np.isfinite(
-            v['__UnitPrice__']), v['__UnitPrice__'], np.nan)
-
-        # if you want whole numbers only, round and cast safely
-        v['__UnitPrice__'] = v['__UnitPrice__'].round(0)  # no decimals
-        v['__UnitPrice__'] = v['__UnitPrice__'].astype(
-            'Int64')  # keeps NaN as <NA>
+        v['__UnitPrice__'] = np.where(
+            np.isfinite(v['__UnitPrice__']),
+            v['__UnitPrice__'],
+            np.nan
+        )
+        v['__UnitPrice__'] = pd.Series(v['__UnitPrice__'], index=v.index).round(2)
 
         is_kinray = 'kinray' in os.path.basename(vp).lower()
         if is_kinray:
@@ -192,11 +193,12 @@ def parse_vendor_files(vendor_paths):
         vendor_frames_price.append(v[['NDC #', 'Vendor', 'PRICE']])
         # --------- add this to feed Alternate NDC logic ----------
         cols_for_alt = ['NDC #', 'Shipped', 'PRICE', 'DATE', 'Vendor']
-        if 'Drug Name' in v.columns:
-            cols_for_alt.append('Drug Name')
-        else:
-            v['Drug Name'] = ""   # ensure column exists
-            cols_for_alt.append('Drug Name')
+        if 'Drug Name' not in v.columns:
+            v['Drug Name'] = ""
+        cols_for_alt.append('Drug Name')
+        if 'Pkg Size' not in v.columns:
+            v['Pkg Size'] = ""
+        cols_for_alt.append('Pkg Size')
 
         all_vendor_rows.append(v[cols_for_alt].copy())
 
@@ -248,15 +250,26 @@ def parse_vendor_files(vendor_paths):
 
         # If OURCASE is purely numeric in many files, try to rank; otherwise string compare works
         # Sort by NDC, then DATE asc, then OURCASE asc; keep last = latest
-        kinray_latest = (
+        kinray_latest_rows = (
             kinray_all
             # must have calculable unit price
             .dropna(subset=['__UnitPrice__'])
             .sort_values(['NDC #', '__DATE__', 'OURCASE'])
             .drop_duplicates(subset=['NDC #'], keep='last')  # latest per NDC
+        )
+        kinray_latest = (
+            kinray_latest_rows
             .loc[:, ['NDC #', '__UnitPrice__']]
             .rename(columns={'__UnitPrice__': 'Kinray_UPrice'})
         )
+        debug_cols = ['NDC #', 'PRICE', 'Shipped', '__UnitPrice__']
+        if not kinray_latest_rows.empty:
+            dbg = kinray_latest_rows.loc[:, debug_cols].head(5).copy()
+            dbg['Returned Kinray price'] = dbg['__UnitPrice__']
+            dbg.rename(columns={'PRICE': 'Invoice $', 'Shipped': 'Ship Qty',
+                                '__UnitPrice__': 'Calculated __UnitPrice__'}, inplace=True)
+            print('[DEBUG Kinray unit price validation]')
+            print(dbg.to_string(index=False))
     else:
         kinray_all = pd.DataFrame(columns=['NDC #', 'DATE', 'OURCASE', 'Shipped', 'PRICE', '__UnitPrice__', 'TYPE'])
         kinray_latest = pd.DataFrame(columns=['NDC #', 'Kinray_UPrice'])

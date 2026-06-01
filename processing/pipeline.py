@@ -26,7 +26,8 @@ from excel.processed_data_sheet import build_processed_data_sheet
 def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, pharmacy_name, date_range, all_pbm_path,
                             selected_processors=None, selected_sheets=None, vendor_count=None,
                             job_dir=None, user_audit_dir=None,
-                            cached_log_df=None, cached_kinray_df=None):
+                            cached_log_df=None, cached_kinray_df=None,
+                            kinray_total=None):
     # ===== Load =====
     bin_df = pd.read_csv(bin_master_path, dtype=str)
 
@@ -616,12 +617,12 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
     audit_name = None
     try:
         print(f"[DEBUG] Final dataframe columns before order helper sheets: {list(final.columns)}")
-        for helper_name, helper_func in [
-            ("Needs to be ordered - All", add_max_difference_sheet),
-            ("Do Not Order - ALL", min_difference_sheet),
+        for helper_name, helper_func, helper_kwargs in [
+            ("Needs to be ordered - All", add_max_difference_sheet, {"kinray_df": all_vendor_df}),
+            ("Do Not Order - ALL", min_difference_sheet, {}),
         ]:
             try:
-                helper_func(wb, final)
+                helper_func(wb, final, **helper_kwargs)
             except Exception as e:
                 print(f"Order helper sheet skipped ({helper_name}): {e}")
 
@@ -642,17 +643,17 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         #     wb, log_df=rx_compare_source, sheet_name="Refills 0 - Call Doctor")
         #add_missed_refill_revenue_sheet(
             #wb, log_df=rx_compare_source, sheet_name="Missed Refill - Revenue Recovery", grace_days=7)
-        # Pre-compute kinray total — only positive Invoice $ rows (excludes service/rebate)
-        try:
-            _kdf = kinray_all.copy()
-            _inv_col = next((c for c in _kdf.columns if 'invoice' in c.lower() and '$' in c), None)
-            if _inv_col:
-                _kdf[_inv_col] = pd.to_numeric(_kdf[_inv_col], errors='coerce').fillna(0)
-                kinray_total_precomputed = float(_kdf[_kdf[_inv_col] > 0][_inv_col].sum())
-            else:
+        # Use pre-computed kinray total passed from main.py (most accurate — from raw Invoice $)
+        kinray_total_precomputed = kinray_total
+        if kinray_total_precomputed is None:
+            # Fallback: compute from kinray_all PRICE column
+            try:
+                _kdf = kinray_all.copy()
+                _kdf['PRICE'] = pd.to_numeric(_kdf['PRICE'], errors='coerce').fillna(0)
+                kinray_total_precomputed = float(_kdf[_kdf['PRICE'] > 0]['PRICE'].sum())
+            except Exception as e:
                 kinray_total_precomputed = None
-        except Exception:
-            kinray_total_precomputed = None
+                print(f'[DEBUG] kinray_total fallback error: {e}')
 
         add_summary_sheet(
             wb,
@@ -661,7 +662,8 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
             processors=processors,
             final_data=final,
             log_df=log_df,
-            kinray_df=kinray_all,
+            kinray_df=all_vendor_df,
+            kinray_raw=kinray_all,
             kinray_total=kinray_total_precomputed,
         )
         #add_alternate_ndc_sheet(wb, custom_log_df, all_vendor_df)
@@ -722,6 +724,37 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         ws = wb["Processed Data"]
         header_row = 3  # your main headers are on row 3
         ws.auto_filter.ref = f"A{header_row}:{get_column_letter(ws.max_column)}{ws.max_row}"
+
+    # Tab colors per sheet
+    tab_colors = {
+        "Summary":                   "0F4C81",
+        "Processed Data":            "1F6B75",
+        "Needs to be ordered - All": "C45911",
+        "Do Not Order - ALL":        "C00000",
+        "Never Ordered - Check":     "7030A0",
+        "RX Comparison - All":       "375623",
+        "MFP Drugs - RX":            "1F3864",
+        "BIN to Processor":          "595959",
+    }
+    for sheet in wb.worksheets:
+        if sheet.title in tab_colors:
+            sheet.sheet_properties.tabColor = tab_colors[sheet.title]
+
+    # Reorder sheets
+    sheet_order = [
+        "Processed Data",
+        "BIN to Processor",
+        "Summary",
+        "Needs to be ordered - All",
+        "Do Not Order - ALL",
+        "RX Comparison - All",
+        "MFP Drugs - RX",
+        "Never Ordered - Check",
+    ]
+    wb._sheets.sort(
+        key=lambda s: sheet_order.index(s.title)
+        if s.title in sheet_order else 99
+    )
 
     wb.save(output_file)
     unblock_file(output_file)

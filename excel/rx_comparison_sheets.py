@@ -25,6 +25,9 @@ def _build_kinray_price_table(kinray_df, max_month):
     kdf['NDC_norm'] = (kdf['NDC #'].astype(str)
         .str.replace(r'\D', '', regex=True).str.zfill(11))
 
+    # Use parser-calculated unit price: Invoice $ / Ship Qty.
+    kdf['__UnitPrice__'] = pd.to_numeric(kdf.get('__UnitPrice__'), errors='coerce')
+
     # Parse date and derive month
     kdf['DATE'] = pd.to_datetime(kdf['DATE'], errors='coerce')
     kdf = kdf.dropna(subset=['DATE', '__UnitPrice__'])
@@ -369,6 +372,7 @@ def add_mfp_drugs_sheet(
 
     df['Pkgs Billed to Insurance'] = df['Package billed']
     df['Kinray Cost (Pkgs × Unit Price)'] = df['Kinray Final Price']
+    df['Total Ins Paid For Pkgs Billed'] = df['Ins Paid Total']
     df['Total = (SDRA + Ins Paid Total)'] = df['SDRA Amt'] + df['Ins Paid Total']
     df['Difference'] = np.where(
         df['Kinray Final Price'] > 0,
@@ -387,8 +391,9 @@ def add_mfp_drugs_sheet(
 
     out_cols = [
         'RX', 'Fill Date', 'NDC', 'Drug Name', 'Pkg Size',
-        'Pkgs Billed to Insurance', 'Kinray Cost (Pkgs × Unit Price)',
-        'Ins Paid Total', 'SDRA Amt', 'Total = (SDRA + Ins Paid Total)',
+        'Pkgs Billed to Insurance',
+        'Total Ins Paid For Pkgs Billed', 'SDRA Amt', 'Total = (SDRA + Ins Paid Total)',
+        'Kinray Cost (Pkgs × Unit Price)',
         'Difference', 'BIN', 'PCN', 'Group'
     ]
     out = df.loc[:, out_cols].copy().sort_values(['Drug Name', 'Fill Date'], ascending=[True, False])
@@ -418,8 +423,8 @@ def add_mfp_drugs_sheet(
 
     widths = {
         'RX': 9, 'Fill Date': 12, 'NDC': 14, 'Drug Name': 40, 'Pkg Size': 8,
-        'Pkgs Billed to Insurance': 12, 'Kinray Price (Pkgs × Unit Price)': 14,
-        'Ins Paid Total': 12, 'SDRA Amt': 10,
+        'Pkgs Billed to Insurance': 12, 'Kinray Cost (Pkgs × Unit Price)': 14,
+        'Total Ins Paid For Pkgs Billed': 22, 'SDRA Amt': 10,
         'Total = (SDRA + Ins Paid Total)': 14, 'Difference': 12,
         'BIN': 9, 'PCN': 12, 'Group': 12
     }
@@ -433,7 +438,7 @@ def add_mfp_drugs_sheet(
     ws.cell(row=total_row, column=label_col, value='Totals').font = Font(bold=True)
     ws.cell(row=total_row, column=label_col).alignment = Alignment(horizontal='right', vertical='center')
 
-    for name in ['Kinray Cost (Pkgs × Unit Price)', 'Ins Paid Total', 'SDRA Amt',
+    for name in ['Kinray Cost (Pkgs × Unit Price)', 'Total Ins Paid For Pkgs Billed', 'SDRA Amt',
                  'Total = (SDRA + Ins Paid Total)', 'Difference']:
         if name not in out_cols:
             continue

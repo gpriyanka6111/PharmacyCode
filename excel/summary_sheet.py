@@ -47,6 +47,7 @@ def add_summary_sheet(
     final_data=None,
     log_df=None,
     kinray_df=None,
+    kinray_raw=None,
     kinray_total=None,
     rx_compare_df=None,
     needs_df=None,
@@ -114,17 +115,7 @@ def add_summary_sheet(
             pass
 
     # Use pre-computed total passed from pipeline — most reliable source
-    if kinray_total is not None:
-        kinray_bill = float(kinray_total)
-    elif kinray_df is not None:
-        try:
-            _inv_col = next((c for c in kinray_df.columns
-                            if 'invoice' in c.lower() and '$' in c), None)
-            if _inv_col:
-                _vals = pd.to_numeric(kinray_df[_inv_col], errors='coerce').fillna(0)
-                kinray_bill = float(_vals[_vals > 0].sum())
-        except Exception:
-            kinray_bill = 0.0
+    kinray_bill = float(kinray_total or 0)
 
     net_profit = insurance_paid - kinray_bill
 
@@ -320,8 +311,22 @@ def add_summary_sheet(
     if kinray_df is not None and log_df is not None:
         try:
             kdf = kinray_df.copy()
+            _ndc_col   = 'NDC #'     if 'NDC #'     in kdf.columns else None
+            _type_col  = 'Vendor'    if 'Vendor'    in kdf.columns else None
+            _price_col = 'PRICE'     if 'PRICE'     in kdf.columns else None
+            _ship_col  = 'Shipped'   if 'Shipped'   in kdf.columns else None
+            _desc_col  = 'Drug Name' if 'Drug Name' in kdf.columns else None
+            _size_col  = next(
+                (c for c in kdf.columns if str(c).strip().lower() in {
+                    'size', 'pkg size', 'package size', 'drug pkg size'
+                }),
+                None
+            )
+            _date_col  = 'DATE'      if 'DATE'      in kdf.columns else None
+            if _ndc_col is None:
+                raise ValueError("No NDC column found in kinray_df")
             kdf['NDC_norm'] = (
-                kdf['NDC #'].astype(str)
+                kdf[_ndc_col].astype(str)
                 .str.replace(r'\D', '', regex=True)
                 .str.zfill(11)
             )
@@ -332,11 +337,6 @@ def add_summary_sheet(
                 .unique()
             )
 
-            _type_col  = 'TYPE'  if 'TYPE'  in kdf.columns else None
-            _price_col = 'PRICE' if 'PRICE' in kdf.columns else (
-                         'Invoice $' if 'Invoice $' in kdf.columns else None)
-            _ship_col  = 'Shipped' if 'Shipped' in kdf.columns else None
-
             if _price_col and _ship_col:
                 agg_kwargs = {
                     'QtyPurchased': (_ship_col,  'sum'),
@@ -344,6 +344,10 @@ def add_summary_sheet(
                 }
                 if _type_col:
                     agg_kwargs['TYPE'] = (_type_col, 'first')
+                if _desc_col:
+                    agg_kwargs['Drug Name'] = (_desc_col, 'first')
+                if _size_col:
+                    agg_kwargs['Pkg Size'] = (_size_col, 'first')
                 kdf_agg = kdf.groupby('NDC_norm', as_index=False).agg(**agg_kwargs)
 
                 never_mask = ~kdf_agg['NDC_norm'].isin(billed_ndcs)
@@ -351,13 +355,21 @@ def add_summary_sheet(
                 # Filter out invalid NDCs (all zeros = null/blank NDC)
                 valid_ndc_mask = kdf_agg['NDC_norm'].str.replace('0', '').str.len() > 0
 
-                if 'TYPE' in kdf_agg.columns:
+                type_source = kinray_raw if kinray_raw is not None else kinray_df
+                if type_source is not None and 'TYPE' in type_source.columns:
+                    _type_df = type_source[['NDC #', 'TYPE']].copy()
+                    _type_df['NDC_norm'] = (_type_df['NDC #'].astype(str)
+                                            .str.replace(r'\D', '', regex=True).str.zfill(11))
+                    ndc_type_map = (_type_df.groupby('NDC_norm')['TYPE']
+                                    .agg(lambda x: x.mode()[0] if not x.mode().empty else '')
+                                    .to_dict())
+                    kdf_agg['TYPE'] = kdf_agg['NDC_norm'].map(ndc_type_map).fillna('')
                     type_s       = kdf_agg['TYPE'].astype(str).str.upper()
-                    brand_mask   = type_s.str.contains(r'BRAND|^B$|^BR$',     na=False, regex=True)
-                    generic_mask = type_s.str.contains(r'GENERIC|^G$|^GEN$',  na=False, regex=True)
+                    brand_mask   = type_s.str.contains(r'BRAND',   na=False, regex=True)
+                    generic_mask = type_s.str.contains(r'GENERIC', na=False, regex=True)
                 else:
                     brand_mask   = pd.Series(False, index=kdf_agg.index)
-                    generic_mask = pd.Series(False, index=kdf_agg.index)
+                    generic_mask = pd.Series(True,  index=kdf_agg.index)
 
                 never_billed_brand_df   = kdf_agg[brand_mask   & never_mask & valid_ndc_mask].copy()
                 never_billed_generic_df = kdf_agg[generic_mask & never_mask & valid_ndc_mask].copy()
@@ -372,7 +384,6 @@ def add_summary_sheet(
                     ))
                 # Also build from Kinray Description column as fallback
                 kinray_name_map = {}
-                _desc_col = next((c for c in kdf.columns if c.strip().lower() == 'description'), None)
                 if _desc_col:
                     kinray_name_map = dict(zip(
                         kdf['NDC_norm'].astype(str),
@@ -384,14 +395,22 @@ def add_summary_sheet(
                         final_data['NDC #'].astype(str).str.replace(r'\D', '', regex=True).str.zfill(11),
                         pd.to_numeric(final_data['Package Size'], errors='coerce')
                     ))
-                # Also build from Kinray Size column as fallback
+                # Build from Kinray Pkg Size column (now in kdf_agg)
                 kinray_size_map = {}
-                _size_col = next((c for c in kdf.columns if c.strip().lower() == 'size'), None)
-                if _size_col:
+                if 'Pkg Size' in kdf_agg.columns:
+                    kinray_size_map = dict(zip(
+                        kdf_agg['NDC_norm'].astype(str),
+                        pd.to_numeric(kdf_agg['Pkg Size'], errors='coerce')
+                    ))
+                elif _size_col:
                     kinray_size_map = dict(zip(
                         kdf['NDC_norm'].astype(str),
                         pd.to_numeric(kdf[_size_col], errors='coerce')
                     ))
+                date_map = {}
+                if _date_col:
+                    kdf[_date_col] = pd.to_datetime(kdf[_date_col], errors='coerce')
+                    date_map = kdf.groupby('NDC_norm')[_date_col].max().to_dict()
 
                 never_billed_brand_df['Drug Name'] = (
                     never_billed_brand_df['NDC_norm']
@@ -403,6 +422,9 @@ def add_summary_sheet(
                     never_billed_brand_df['NDC_norm']
                     .map(pkg_size_map)
                     .fillna(never_billed_brand_df['NDC_norm'].map(kinray_size_map))
+                )
+                never_billed_brand_df['Invoice Date'] = (
+                    never_billed_brand_df['NDC_norm'].map(date_map)
                 )
                 never_billed_brand_df['NDC'] = never_billed_brand_df['NDC_norm']
 
@@ -442,7 +464,8 @@ def add_summary_sheet(
     ws.row_dimensions[30].height = 18
 
     # Row 31: brand table column headers
-    brand_table_cols = ['Drug Name', 'NDC', 'Pkg Size', 'Qty Purchased', 'Total Cost', 'Type']
+    brand_table_cols = ['Drug Name', 'NDC', 'Pkg Size', 'Invoice Date',
+                        'Qty Purchased', 'Total Cost', 'Type']
     for ci, col_name in enumerate(brand_table_cols, start=1):
         c = ws.cell(row=31, column=ci, value=col_name)
         c.fill      = PatternFill("solid", fgColor=FILL_PURPLE)
@@ -461,11 +484,13 @@ def add_summary_sheet(
             drug_name   = str(row.get('Drug Name', ''))
             ndc         = str(row.get('NDC', row.get('NDC_norm', '')))
             pkg_size    = row.get('Pkg Size', '')
+            inv_date    = row.get('Invoice Date', '')
+            inv_date    = pd.to_datetime(inv_date).date() if pd.notna(inv_date) else ''
             qty_purch   = float(row.get('QtyPurchased', 0) or 0)
             total_cost  = float(row.get('TotalCost', 0) or 0)
             drug_type   = str(row.get('TYPE', '')) if _type_in_brand else ''
 
-            row_vals = [drug_name, ndc, pkg_size, qty_purch, total_cost, drug_type]
+            row_vals = [drug_name, ndc, pkg_size, inv_date, qty_purch, total_cost, drug_type]
             for ci, val in enumerate(row_vals, start=1):
                 c = ws.cell(row=current_row, column=ci, value=val)
                 c.fill      = PatternFill("solid", fgColor=fill_hex)
@@ -473,13 +498,15 @@ def add_summary_sheet(
                 c.alignment = Alignment(
                     horizontal='left' if ci == 1 else 'center',
                     vertical='center',
-                    wrap_text=(ci == 1)
+                    wrap_text=False
                 )
                 if ci == 4:
-                    c.number_format = '#,##0'
+                    c.number_format = 'mm/dd/yyyy'
                 elif ci == 5:
+                    c.number_format = '#,##0'
+                elif ci == 6:
                     c.number_format = money_fmt
-            ws.row_dimensions[current_row].height = 15
+            ws.row_dimensions[current_row].height = 20
             current_row += 1
     else:
         ws.cell(row=current_row, column=1,
@@ -488,7 +515,15 @@ def add_summary_sheet(
         current_row += 1
 
     # Brand table specific column widths (applied after general widths)
-    _brand_col_widths = {1: 45, 2: 16, 3: 10, 4: 12, 5: 14, 6: 10}
+    _brand_col_widths = {
+        1: 35,
+        2: 16,
+        3: 10,
+        4: 12,
+        5: 14,
+        6: 14,
+        7: 15
+    }
     for ci, w in _brand_col_widths.items():
         ws.column_dimensions[get_column_letter(ci)].width = w
 
@@ -497,7 +532,7 @@ def add_summary_sheet(
     current_row += 1
 
     # ══════════════════════════════════════════════════════════════
-    # SECTION 5 — Processor Breakdown (flipped: processors as rows)
+    # SECTION 5 — Processor Breakdown (beside main content, col J+)
     # ══════════════════════════════════════════════════════════════
     if processors is None and final_data is not None:
         _procs_found = set()
@@ -505,13 +540,31 @@ def add_summary_sheet(
             for _sfx in ('_T', '_Pur', '_Net'):
                 if _col.endswith(_sfx):
                     _procs_found.add(_col[:-len(_sfx)])
-        processors = sorted(_procs_found)
-        if 'ALL_PBM' in processors:
-            processors = ['ALL_PBM'] + sorted(p for p in processors if p != 'ALL_PBM')
+        processors = sorted(
+            p for p in _procs_found
+            if str(p).strip().upper() != "ALL_PBM"
+        )
+    processors = [
+        p for p in (processors or [])
+        if str(p).strip().upper() != "ALL_PBM"
+    ]
 
-    section_header(ws, current_row, 1, 5, "Processor Breakdown")
-    ws.row_dimensions[current_row].height = 22
-    current_row += 1
+    # Place processor table at column J (col 10), starting row 4
+    PROC_COL_START = 10  # column J
+    proc_row = 4
+
+    # Section header
+    ws.merge_cells(
+        start_row=proc_row, start_column=PROC_COL_START,
+        end_row=proc_row, end_column=PROC_COL_START + 4
+    )
+    c = ws.cell(row=proc_row, column=PROC_COL_START, value="PROCESSOR BREAKDOWN")
+    c.fill = PatternFill("solid", fgColor=FILL_GRAY)
+    c.font = Font(bold=True, color=TEXT_BLUE, size=10)
+    c.alignment = Alignment(horizontal='left', vertical='center')
+    c.border = Border(bottom=Side(style='thin'))
+    ws.row_dimensions[proc_row].height = 22
+    proc_row += 1
 
     # Table header row
     proc_headers = [
@@ -519,26 +572,25 @@ def add_summary_sheet(
         'Insurance $ (BestRx)',
         '100% Purchased (Kinray)',
         'Net (Paid−Purchased)',
-        'Needs to Order Est. ($)',
+        'Order Est. from Sheet ($)',
     ]
     _thick_b = Border(bottom=Side(style='thick'))
     _thick_t = Border(top=Side(style='thick'))
-    for ci, h in enumerate(proc_headers, start=1):
-        c = ws.cell(row=current_row, column=ci, value=h)
+    for ci, h in enumerate(proc_headers, start=PROC_COL_START):
+        c = ws.cell(row=proc_row, column=ci, value=h)
         c.fill      = PatternFill("solid", fgColor="0F4C81")
         c.font      = Font(bold=True, color="FFFFFF", size=10)
         c.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
         c.border    = _thick_b
-    ws.row_dimensions[current_row].height = 30
-    current_row += 1
+    ws.row_dimensions[proc_row].height = 30
+    proc_row += 1
 
     totals = [0.0, 0.0, 0.0, 0.0]
     alt_proc_fills = ["FFFFFF", "F0F6FF"]
 
     for p_idx, proc in enumerate(processors or []):
-        fill_hex = "0F4C81" if proc == 'ALL_PBM' else alt_proc_fills[p_idx % 2]
-        font_color = "FFFFFF" if proc == 'ALL_PBM' else TEXT_DARK
-        is_allpbm = proc == 'ALL_PBM'
+        fill_hex   = alt_proc_fills[p_idx % 2]
+        font_color = TEXT_DARK
         ins = pur = net = needs_est = 0.0
         if final_data is not None:
             try:
@@ -560,43 +612,46 @@ def add_summary_sheet(
                 pass
 
         row_vals = [proc, ins, pur, net, needs_est]
-        for ci, val in enumerate(row_vals, start=1):
-            c = ws.cell(row=current_row, column=ci, value=val)
+        for ci, val in enumerate(row_vals, start=PROC_COL_START):
+            c = ws.cell(row=proc_row, column=ci, value=val)
             c.fill      = PatternFill("solid", fgColor=fill_hex)
-            c.font      = Font(size=10, bold=is_allpbm, color=font_color)
+            c.font      = Font(size=10, color=font_color)
             c.alignment = Alignment(
-                horizontal='left' if ci == 1 else 'center',
+                horizontal='left' if ci == PROC_COL_START else 'center',
                 vertical='center'
             )
-            if ci > 1:
+            if ci > PROC_COL_START:
                 c.number_format = money_fmt
-        ws.row_dimensions[current_row].height = 18
-        # Exclude ALL_PBM from totals — it's the aggregate of all processors
-        if proc != 'ALL_PBM':
-            totals[0] += ins
-            totals[1] += pur
-            totals[2] += net
-            totals[3] += needs_est
-        current_row += 1
+        ws.row_dimensions[proc_row].height = 18
+        totals[0] += ins
+        totals[1] += pur
+        totals[2] += net
+        totals[3] += needs_est
+        proc_row += 1
 
     # Total row
     total_row_vals = ['TOTAL'] + totals
-    for ci, val in enumerate(total_row_vals, start=1):
-        c = ws.cell(row=current_row, column=ci, value=val)
+    for ci, val in enumerate(total_row_vals, start=PROC_COL_START):
+        c = ws.cell(row=proc_row, column=ci, value=val)
         c.fill      = PatternFill("solid", fgColor=FILL_BLUE)
         c.font      = Font(bold=True, color=TEXT_BLUE, size=10)
         c.alignment = Alignment(
-            horizontal='left' if ci == 1 else 'center',
+            horizontal='left' if ci == PROC_COL_START else 'center',
             vertical='center'
         )
         c.border = _thick_t
-        if ci > 1:
+        if ci > PROC_COL_START:
             c.number_format = money_fmt
-    ws.row_dimensions[current_row].height = 22
+    ws.row_dimensions[proc_row].height = 22
 
-    # Final column widths — processor table overrides B-E to 22
-    ws.column_dimensions['A'].width = 45   # brand table drug name
-    for _cl in ['B', 'C', 'D', 'E']:
-        ws.column_dimensions[_cl].width = 22
-    for _cl in ['F', 'G', 'H']:
-        ws.column_dimensions[_cl].width = 18
+    # Column widths for processor table (J-N)
+    ws.column_dimensions['J'].width = 14  # Processor
+    ws.column_dimensions['K'].width = 16  # Insurance $
+    ws.column_dimensions['L'].width = 16  # 100% Purchased
+    ws.column_dimensions['M'].width = 14  # Net
+    ws.column_dimensions['N'].width = 16  # Needs to Order Est.
+
+    # Final column widths — main content A-H
+    for ci, w in _brand_col_widths.items():
+        ws.column_dimensions[get_column_letter(ci)].width = w
+    ws.column_dimensions['H'].width = 18

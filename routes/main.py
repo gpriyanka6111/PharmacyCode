@@ -635,6 +635,7 @@ def finalize_job():
             selected_processors=selected_processors,
             selected_sheets=selected_sheets,
             user_audit_dir=audit_save_dir,
+            kinray_total=ctx.get("summary", {}).get("total_kinray"),
         )
         if not result or not isinstance(result, dict):
             return jsonify({"ok": False, "error": "Report generation returned no filename"}), 500

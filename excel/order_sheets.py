@@ -103,6 +103,8 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
         if col_name in difference_columns + ['Pkg Size', 'Do Not Order']:
             align = Alignment(horizontal='center', vertical='bottom', text_rotation=90)
         cell.alignment = align
+    ws.cell(row=2, column=display_columns.index('Do Not Order') + 1,
+            value='Pkgs Do Not Order')
 
     for r_idx, row_data in enumerate(out.itertuples(index=False, name=None), start=3):
         for c_idx, val in enumerate(row_data, start=1):
@@ -199,7 +201,7 @@ def min_difference_sheet(wb, final_data, insurance_paths=None):
     ws.add_table(tab)
 
 
-def add_max_difference_sheet(wb, final_data, insurance_paths=None):
+def add_max_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=None):
     """
     Create a 'Needs to be ordered - All' worksheet showing:
       - All *_D columns (package differences per processor) with original values (positives kept visible)
@@ -281,20 +283,47 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
     else:
         needs['Drug Type'] = 'Unclassified'
 
-    # Purchase Status — Never Purchased if Total Purchased == 0
-    if 'Total Purchased' in df.columns:
-        needs['Purchase Status'] = df.loc[needs_mask, 'Total Purchased'].apply(
-            lambda x: 'Never Purchased' if pd.to_numeric(x, errors='coerce') == 0
-                      else 'Previously Purchased'
-        ).values
-    else:
-        needs['Purchase Status'] = 'Unknown'
+    # Build latest purchase lookup from Kinray
+    latest_month_map = {}
+    qty_in_month_map = {}
 
-    # 5) Build display frame (keep ORIGINAL *_D values = positives visible)
+    if kinray_df is not None:
+        try:
+            kdf = kinray_df.copy()
+            kdf['NDC_norm'] = (kdf['NDC #'].astype(str)
+                               .str.replace(r'\D', '', regex=True).str.zfill(11))
+            kdf['DATE'] = pd.to_datetime(kdf['DATE'], errors='coerce')
+            kdf = kdf.dropna(subset=['DATE'])
+            kdf['Ship Qty'] = pd.to_numeric(kdf['Shipped'], errors='coerce').fillna(0)
+            kdf['YearMonth'] = kdf['DATE'].dt.to_period('M')
+            latest_period = kdf.groupby('NDC_norm')['YearMonth'].max()
+            for ndc, period in latest_period.items():
+                latest_month_map[ndc] = period.strftime('%b %Y')
+                mask = (kdf['NDC_norm'] == ndc) & (kdf['YearMonth'] == period)
+                qty_in_month_map[ndc] = int(kdf.loc[mask, 'Ship Qty'].sum())
+        except Exception as e:
+            print(f'[DEBUG] Latest purchase lookup error: {e}')
+
+    needs['NDC_norm'] = needs['NDC #'].astype(str).str.replace(r'\D', '', regex=True).str.zfill(11)
+    needs['Last Purchase Month'] = needs['NDC_norm'].map(latest_month_map).fillna('Never')
+    needs['Qty in That Month'] = needs['NDC_norm'].map(qty_in_month_map).fillna(0).astype(int)
+    needs.drop(columns=['NDC_norm'], inplace=True)
+
+    # Rename before display
+    needs.rename(columns={
+        'Qty in That Month': 'Qty Purchased (Month)',
+        'To Order': 'Pkgs to Order',
+        'PRICE': 'Kinray Unit Price',
+        'Total Order Price': 'Kinray Price (Pkgs to Order × Unit Price)'
+    }, inplace=True)
+
+    # 5) Build display frame
     display_columns = (
         ['NDC #', 'Drug Name', 'Pkg Size'] +
         difference_columns +
-        ['To Order', 'Paper Work', 'PRICE', 'Purchase Status', 'Total Order Price']
+        ['Pkgs to Order', 'Last Purchase Month',
+         'Qty Purchased (Month)', 'Paper Work', 'Kinray Unit Price',
+         'Kinray Price (Pkgs to Order × Unit Price)']
     )
     needs = needs[display_columns].sort_values('Drug Name')
     _num_cols = needs.select_dtypes(include='number').columns
@@ -350,9 +379,11 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
         idx = _safe_display_index(display_columns, col_name, "Needs Ordered column widths")
         if idx:
             ws.column_dimensions[get_column_letter(idx)].width = 8
-    idx = _safe_display_index(display_columns, 'To Order', "Needs Ordered column widths")
+    idx = _safe_display_index(display_columns, 'Pkgs to Order', "Needs Ordered column widths")
     if idx:
         ws.column_dimensions[get_column_letter(idx)].width = 12
+        ws.cell(row=2, column=idx).alignment = Alignment(
+            horizontal='center', vertical='center', wrap_text=True)
     # PAPER WORK column
     idx = _safe_display_index(display_columns, 'Paper Work', "Needs Ordered paper work formatting")
     if idx:
@@ -361,19 +392,50 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
         ws.column_dimensions[col_letter].alignment = Alignment(
             horizontal='center', vertical='center', wrap_text=True)
 
-    idx = _safe_display_index(display_columns, 'PRICE', "Needs Ordered price width")
+    idx = _safe_display_index(display_columns, 'Kinray Unit Price', "Needs Ordered price width")
     if idx:
         ws.column_dimensions[get_column_letter(idx)].width = 12
-    # PURCHASE STATUS column
-    idx = _safe_display_index(display_columns, 'Purchase Status', "Purchase Status width")
-    if idx:
-        ws.column_dimensions[get_column_letter(idx)].width = 18
+        ws.cell(row=2, column=idx).alignment = Alignment(
+            horizontal='center', vertical='center', wrap_text=True)
     # TOTAL ORDER PRICE column
-    idx = _safe_display_index(display_columns, 'Total Order Price', "Needs Ordered total order price formatting")
+    idx = _safe_display_index(display_columns, 'Kinray Price (Pkgs to Order × Unit Price)', "Needs Ordered total order price formatting")
     if idx:
         col_letter = get_column_letter(idx)
         ws.column_dimensions[col_letter].width = 16
-        ws.column_dimensions[col_letter].alignment = Alignment(
+        ws.cell(row=2, column=idx).alignment = Alignment(
+            horizontal='center', vertical='center', wrap_text=True)
+    idx = _safe_display_index(display_columns, 'Last Purchase Month', "Last Purchase Month width")
+    if idx:
+        ws.column_dimensions[get_column_letter(idx)].width = 9
+        ws.cell(row=2, column=idx).alignment = Alignment(
+            horizontal='center', vertical='center', wrap_text=True)
+        never_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        for row_idx in range(3, last_data_row + 1):
+            cell = ws.cell(row=row_idx, column=idx)
+            if str(cell.value).strip().lower() == "never":
+                cell.fill = never_fill
+    idx = _safe_display_index(display_columns, 'Qty Purchased (Month)', "Qty Purchased width")
+    if idx:
+        ws.column_dimensions[get_column_letter(idx)].width = 10
+        ws.cell(row=2, column=idx).alignment = Alignment(
+            horizontal='center', vertical='center', wrap_text=True)
+    for header_name in [
+        'Pkgs to Order',
+        'Last Purchase Month',
+        'Qty Purchased (Month)',
+        'Kinray Unit Price',
+        'Kinray Price (Pkgs to Order × Unit Price)'
+    ]:
+        idx = _safe_display_index(display_columns, header_name, f"{header_name} header wrap")
+        if idx:
+            ws.cell(row=2, column=idx).alignment = Alignment(
+                horizontal='center', vertical='center', wrap_text=True)
+    # PAPER WORK column
+    idx = _safe_display_index(display_columns, 'Paper Work', "Paper Work width")
+    if idx:
+        col_letter = get_column_letter(idx)
+        ws.column_dimensions[col_letter].width = 12
+        ws.cell(row=2, column=idx).alignment = Alignment(
             horizontal='center', vertical='center', wrap_text=True)
 
     # 9) Borders and header height
@@ -409,8 +471,10 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
         if _idx:
             _apply_group_thick_border(ws, _idx, _idx, 2, _last_row)
 
-    # To Order, Paper Work, PRICE, Purchase Status, Total Order Price each gets its own thick border
-    for _col_name in ['To Order', 'Paper Work', 'PRICE', 'Purchase Status', 'Total Order Price']:
+    # To Order, Paper Work, PRICE, Total Order Price, and new cols each get their own thick border
+    for _col_name in ['Pkgs to Order', 'Paper Work', 'Kinray Unit Price',
+                      'Kinray Price (Pkgs to Order × Unit Price)',
+                      'Last Purchase Month', 'Qty Purchased (Month)']:
         _idx = _safe_display_index(
             display_columns, _col_name, f"thick border {_col_name}")
         if _idx:
@@ -432,7 +496,7 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
 
-    price_idx = _safe_display_index(display_columns, 'PRICE', "Needs Ordered numeric formatting")
+    price_idx = _safe_display_index(display_columns, 'Kinray Unit Price', "Needs Ordered numeric formatting")
     # --- build the two summary columns (label + amount) ---
     def _find_header_col(ws, header_text, header_row=2):
         for c in range(1, ws.max_column + 1):
@@ -449,8 +513,8 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
         print("[DEBUG] Needs Ordered summary headers: skipping optional summary section")
         top_total_hdr_col = len(display_columns)
 
-    summary_label_col = top_total_hdr_col + 2  # skip Drug Type column
-    summary_value_col = top_total_hdr_col + 3
+    summary_label_col = top_total_hdr_col + 4  # skip two new columns + gap
+    summary_value_col = top_total_hdr_col + 5
 
     hdr_cell = ws.cell(row=2, column=summary_label_col,
                        value="Insurance-wise Order Estimate ($)")
@@ -484,7 +548,7 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
             vcell.alignment = Alignment(horizontal="left", vertical="center")
             r += 1
     else:
-        print("[DEBUG] Needs Ordered summary formulas: missing optional column 'PRICE'")
+        print("[DEBUG] Needs Ordered summary formulas: missing optional column 'Kinray Unit Price'")
 
     # === Formatting for summary columns ===
     for col_idx in (summary_label_col, summary_value_col):
@@ -509,7 +573,7 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
         ws.cell(row=rr, column=summary_value_col).border = thin
 
     # === Grand Total footer OUTSIDE sort/filter range ===
-    total_col_idx = _safe_display_index(display_columns, 'Total Order Price', "Needs Ordered grand total")
+    total_col_idx = _safe_display_index(display_columns, 'Kinray Price (Pkgs to Order × Unit Price)', "Needs Ordered grand total")
     if total_col_idx:
         total_col_letter = get_column_letter(total_col_idx)
         footer_row = last_data_row + 2
@@ -545,22 +609,6 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None):
         ws.conditional_formatting.add(
             data_range,
             CellIsRule(operator='greaterThan', formula=['0'], stopIfTrue=False, fill=green_fill)
-        )
-
-    # === Conditional formatting: Purchase Status ===
-    status_idx = _safe_display_index(display_columns, 'Purchase Status', "Purchase Status CF")
-    if status_idx:
-        status_letter = get_column_letter(status_idx)
-        status_range = f"{status_letter}3:{status_letter}{last_data_row}"
-        ws.conditional_formatting.add(
-            status_range,
-            CellIsRule(operator='equal', formula=['"Never Purchased"'],
-                       stopIfTrue=False, fill=red_fill)
-        )
-        ws.conditional_formatting.add(
-            status_range,
-            CellIsRule(operator='equal', formula=['"Previously Purchased"'],
-                       stopIfTrue=False, fill=green_fill)
         )
 
     # === NOW set print area to exclude the two summary columns ===

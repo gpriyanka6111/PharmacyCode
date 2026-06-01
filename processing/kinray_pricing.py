@@ -30,13 +30,28 @@ def find_kinray_price_by_month(ndc, fill_date, kinray_df):
     target_year = fill_date.year
     target_month = fill_date.month
 
+    def _return_price(row):
+        price = row['__UnitPrice__']
+        count = getattr(find_kinray_price_by_month, '_debug_count', 0)
+        if count < 5:
+            print(
+                "[DEBUG Kinray price lookup] "
+                f"NDC={row.get('NDC #', ndc)} "
+                f"Invoice $={row.get('PRICE', pd.NA)} "
+                f"Ship Qty={row.get('Shipped', pd.NA)} "
+                f"Calculated __UnitPrice__={price} "
+                f"Returned Kinray price={price}"
+            )
+            find_kinray_price_by_month._debug_count = count + 1
+        return price
+
     # Try same month first
     same_month = ndc_purchases[
         (ndc_purchases['DATE'].dt.year == target_year) &
         (ndc_purchases['DATE'].dt.month == target_month)
     ]
     if not same_month.empty:
-        return same_month.sort_values('DATE').iloc[-1]['__UnitPrice__']
+        return _return_price(same_month.sort_values('DATE').iloc[-1])
 
     # Get min and max dates available
     min_date = ndc_purchases['DATE'].min()
@@ -51,7 +66,7 @@ def find_kinray_price_by_month(ndc, fill_date, kinray_df):
             (ndc_purchases['DATE'].dt.month == current_date.month)
         ]
         if not month_data.empty:
-            return month_data.sort_values('DATE').iloc[-1]['__UnitPrice__']
+            return _return_price(month_data.sort_values('DATE').iloc[-1])
 
     # Search forwards
     current_date = fill_date
@@ -62,7 +77,7 @@ def find_kinray_price_by_month(ndc, fill_date, kinray_df):
             (ndc_purchases['DATE'].dt.month == current_date.month)
         ]
         if not month_data.empty:
-            return month_data.sort_values('DATE').iloc[-1]['__UnitPrice__']
+            return _return_price(month_data.sort_values('DATE').iloc[-1])
 
     return 0
 
