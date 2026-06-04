@@ -8,14 +8,19 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.pagebreak import PageBreak
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
-from excel.formatting import set_print_area_excluding_headers
-
 
 def _safe_display_index(display_columns, column_name, context):
     if column_name not in display_columns:
         print(f"[DEBUG] {context}: missing optional column '{column_name}'")
         return None
     return display_columns.index(column_name) + 1
+
+
+def _set_print_area_after_repeated_cols(ws, first_print_col, last_print_col):
+    ws.print_area = (
+        f"{get_column_letter(first_print_col)}1:"
+        f"{get_column_letter(last_print_col)}{ws.max_row}"
+    )
 
 
 def min_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=None):
@@ -112,12 +117,15 @@ def min_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=None):
         out['Drug Type'] = df.loc[mask, 'Drug Type'].values
     else:
         out['Drug Type'] = 'Unclassified'
-    out.rename(columns={'Package Size': 'Pkg Size'}, inplace=True)
+    out.rename(columns={
+        'Package Size': 'Pkg Size',
+        'Insurance': 'Lowest Insurance',
+    }, inplace=True)
 
     display_columns = (
         ['NDC #', 'Drug Name', 'Pkg Size'] +
         difference_columns +
-        ['Do Not Order', 'Insurance', 'Latest Purchase Month', 'Total Pkgs Purchased(Month)', 'Paper Work']
+        ['Do Not Order', 'Lowest Insurance', 'Latest Purchase Month', 'Total Pkgs Purchased(Month)', 'Paper Work']
     )
     out = out[display_columns].sort_values('Drug Name')
     _num_cols = out.select_dtypes(include='number').columns
@@ -168,7 +176,7 @@ def min_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=None):
         idx = _safe_display_index(display_columns, col_name, "Do Not Order column widths")
         if idx:
             ws.column_dimensions[get_column_letter(idx)].width = 8
-    idx = _safe_display_index(display_columns, 'Insurance', "Insurance width")
+    idx = _safe_display_index(display_columns, 'Lowest Insurance', "Lowest Insurance width")
     if idx:
         ws.column_dimensions[get_column_letter(idx)].width = 12
         ws.cell(row=2, column=idx).alignment = Alignment(
@@ -218,7 +226,7 @@ def min_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=None):
                 cell.border = Border(left=left, right=right,
                                      top=top, bottom=bottom)
 
-    for col_name in ['NDC #', 'Drug Name', 'Pkg Size', 'Do Not Order', 'Insurance',
+    for col_name in ['NDC #', 'Drug Name', 'Pkg Size', 'Do Not Order', 'Lowest Insurance',
                      'Latest Purchase Month', 'Total Pkgs Purchased(Month)', 'Paper Work']:
         idx = _safe_display_index(display_columns, col_name, f"Do Not Order thick border {col_name}")
         if idx:
@@ -244,25 +252,24 @@ def min_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=None):
             ws.cell(row=row_offset, column=min_col_idx).fill = min_fill
 
     # --- 8) Freeze panes
-    ws.freeze_panes = 'A3'
+    ws.freeze_panes = 'D3'
     ws.page_setup.orientation  = ws.ORIENTATION_LANDSCAPE
     ws.page_setup.fitToWidth   = 1
     ws.page_setup.fitToHeight  = 0
-    ws.page_setup.scale        = 100
+    ws.page_setup.scale        = None
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
     ws.print_title_rows = "1:2"
-    ws.print_title_columns = "A:C"  # repeat NDC#, Drug Name, Pkg Size on every page
+    ws.print_title_cols = "A:C"  # repeat NDC#, Drug Name, Pkg Size on every page
     ws.page_margins.left   = 0.25
     ws.page_margins.right  = 0.25
     ws.page_margins.top    = 0.4
     ws.page_margins.bottom = 0.4
     ws.page_margins.header = 0.2
     ws.page_margins.footer = 0.2
-    set_print_area_excluding_headers(
-        ws, header_row=2,
-        exclude_headers=difference_columns
-    )
+    first_print_col = _safe_display_index(display_columns, 'Do Not Order', "Do Not Order print area")
+    if first_print_col:
+        _set_print_area_after_repeated_cols(ws, first_print_col, len(display_columns))
     ws.auto_filter.ref = f"A2:{get_column_letter(len(display_columns))}{ws.max_row}"
     n_cols = len(display_columns)
     tab = Table(displayName="TableDoNotOrder",
@@ -398,12 +405,13 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=Non
         return min_col[:-2] if min_col.endswith('_D') else min_col
 
     needs['Insurance'] = needs[difference_columns].apply(_min_processor, axis=1)
+    needs.rename(columns={'Insurance': 'Lowest Insurance'}, inplace=True)
 
     # 5) Build display frame
     display_columns = (
         ['NDC #', 'Drug Name', 'Pkg Size'] +
         difference_columns +
-        ['Pkgs to Order', 'Insurance', 'Last Purchase Month',
+        ['Pkgs to Order', 'Lowest Insurance', 'Last Purchase Month',
          'Total Pkgs Purchased(Month)', 'Paper Work', 'Kinray Unit Price',
          'Kinray Price (Pkgs to Order × Unit Price)']
     )
@@ -466,7 +474,7 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=Non
         ws.column_dimensions[get_column_letter(idx)].width = 12
         ws.cell(row=2, column=idx).alignment = Alignment(
             horizontal='center', vertical='center', wrap_text=True)
-    idx = _safe_display_index(display_columns, 'Insurance', "Insurance width")
+    idx = _safe_display_index(display_columns, 'Lowest Insurance', "Lowest Insurance width")
     if idx:
         ws.column_dimensions[get_column_letter(idx)].width = 12
         ws.cell(row=2, column=idx).alignment = Alignment(
@@ -558,8 +566,8 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=Non
         if _idx:
             _apply_group_thick_border(ws, _idx, _idx, 2, _last_row)
 
-    # To Order, Insurance, Paper Work, PRICE, Total Order Price, and new cols each get their own thick border
-    for _col_name in ['Pkgs to Order', 'Insurance', 'Paper Work', 'Kinray Unit Price',
+    # To Order, Lowest Insurance, Paper Work, PRICE, Total Order Price, and new cols each get their own thick border
+    for _col_name in ['Pkgs to Order', 'Lowest Insurance', 'Paper Work', 'Kinray Unit Price',
                       'Kinray Price (Pkgs to Order × Unit Price)',
                       'Last Purchase Month', 'Total Pkgs Purchased(Month)']:
         _idx = _safe_display_index(
@@ -575,14 +583,14 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=Non
 
     # --- page setup BEFORE summary is fine (heights, breaks, etc.) ---
     ws.print_title_rows = "1:2"
-    ws.print_title_columns = "A:C"  # repeat NDC#, Drug Name, Pkg Size on every page
+    ws.print_title_cols = "A:C"  # repeat NDC#, Drug Name, Pkg Size on every page
     ws.row_breaks = PageBreak()
     ws.row_dimensions[2].height = 80
     ws.freeze_panes = "D3"
     ws.page_setup.orientation  = ws.ORIENTATION_LANDSCAPE
     ws.page_setup.fitToWidth   = 1
     ws.page_setup.fitToHeight  = 0
-    ws.page_setup.scale        = 100
+    ws.page_setup.scale        = None
     ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
     ws.page_setup.blackAndWhite = True
@@ -602,10 +610,11 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=Non
                 return c
         return None
 
-    top_total_hdr_col = _find_header_col(ws, "Total Order Price", header_row=2)
+    total_order_header = "Kinray Price (Pkgs to Order × Unit Price)"
+    top_total_hdr_col = _find_header_col(ws, total_order_header, header_row=2)
     if top_total_hdr_col is None:
         top_total_hdr_col = _safe_display_index(
-            display_columns, "Total Order Price", "Needs Ordered summary headers")
+            display_columns, total_order_header, "Needs Ordered summary headers")
     if top_total_hdr_col is None:
         print("[DEBUG] Needs Ordered summary headers: skipping optional summary section")
         top_total_hdr_col = len(display_columns)
@@ -708,11 +717,10 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=Non
             CellIsRule(operator='greaterThan', formula=['0'], stopIfTrue=False, fill=green_fill)
         )
 
-    # === NOW set print area to exclude processor columns and the two summary columns ===
-    set_print_area_excluding_headers(
-        ws, header_row=2,
-        exclude_headers=difference_columns + ["Insurance-wise Order Estimate ($)", "Amount"]
-    )
+    # Print title columns provide A:C on every page; the print area itself stays contiguous.
+    first_print_col = _safe_display_index(display_columns, 'Pkgs to Order', "Needs Ordered print area")
+    if first_print_col:
+        _set_print_area_after_repeated_cols(ws, first_print_col, len(display_columns))
 
     # === Filter range limited to data only (keeps footer fixed) ===
     ws.auto_filter.ref = f"A2:{get_column_letter(len(display_columns))}{last_data_row}"

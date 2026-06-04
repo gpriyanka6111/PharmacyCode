@@ -56,25 +56,12 @@ def _build_kinray_price_table(kinray_df, max_month):
     price_filled = full_grid.merge(price_table, on=['NDC_norm', 'Month'], how='left')
 
     # ffill = backward search, bfill = forward search
-    try:
-        price_filled = (price_filled
-            .sort_values(['NDC_norm', 'Month'])
-            .groupby('NDC_norm', group_keys=False)
-            .apply(lambda g: g.assign(
-                __unit_price__=g['__unit_price__'].ffill().bfill()
-            ), include_groups=False)
-            .reset_index(drop=True)
-        )
-    except TypeError:
-        # pandas < 2.2 doesn't support include_groups
-        price_filled = (price_filled
-            .sort_values(['NDC_norm', 'Month'])
-            .groupby('NDC_norm', group_keys=False)
-            .apply(lambda g: g.assign(
-                __unit_price__=g['__unit_price__'].ffill().bfill()
-            ))
-            .reset_index(drop=True)
-        )
+    price_filled = price_filled.sort_values(['NDC_norm', 'Month']).reset_index(drop=True)
+    price_filled['__unit_price__'] = (
+        price_filled
+        .groupby('NDC_norm')['__unit_price__']
+        .transform(lambda s: s.ffill().bfill())
+    )
 
     return price_filled[['NDC_norm', 'Month', '__unit_price__']]
 
@@ -334,6 +321,7 @@ def add_rx_unit_compare_sheet_exact(
 
     # ── RX Comparison Summary box (placed 2 cols right of data) ──
     _S = len(out_cols) + 2  # column P when out_cols has 14 cols
+    _summary_start_row = 3
     _money = '"$"#,##0.00'
     _count = '#,##0'
 
@@ -350,12 +338,13 @@ def add_rx_unit_compare_sheet_exact(
         return c
 
     # Header
-    ws.merge_cells(start_row=1, start_column=_S, end_row=1, end_column=_S + 2)
-    hdr = ws.cell(row=1, column=_S, value="RX COMPARISON SUMMARY")
+    ws.merge_cells(start_row=_summary_start_row, start_column=_S,
+                   end_row=_summary_start_row, end_column=_S + 2)
+    hdr = ws.cell(row=_summary_start_row, column=_S, value="RX COMPARISON SUMMARY")
     hdr.fill      = PatternFill("solid", fgColor="0F4C81")
     hdr.font      = Font(bold=True, color="FFFFFF", size=11)
     hdr.alignment = Alignment(horizontal='center', vertical='center')
-    ws.row_dimensions[1].height = 28
+    ws.row_dimensions[_summary_start_row].height = 28
 
     # Section 1 — RX counts
     _rows_s1 = [
@@ -363,19 +352,19 @@ def add_rx_unit_compare_sheet_exact(
         ("Kinray Price Available",  _rx_with_price,     _count, "EAF3DE", "375623"),
         ("No Kinray Price",         _rx_no_price,       _count, "FAEEDA", "854F0B"),
     ]
-    _r = 2
+    _r = _summary_start_row + 1
     for label, val, fmt, fill, color in _rows_s1:
         _sum_cell(ws, _r, _S,     label, fill, color, label=True)
         _sum_cell(ws, _r, _S + 1, val,   fill, color, num_fmt=fmt)
         ws.merge_cells(start_row=_r, start_column=_S + 1,
                        end_row=_r, end_column=_S + 2)
-        ws.row_dimensions[_r].height = 20
+        ws.row_dimensions[_r].height = 22
         _r += 1
 
     # Divider
     ws.merge_cells(start_row=_r, start_column=_S, end_row=_r, end_column=_S + 2)
     ws.cell(row=_r, column=_S).fill = PatternFill("solid", fgColor="C3D9F5")
-    ws.row_dimensions[_r].height = 4
+    ws.row_dimensions[_r].height = 22
     _r += 1
 
     # Section 2 — Overpaid / Underpaid
@@ -394,7 +383,7 @@ def add_rx_unit_compare_sheet_exact(
     # Divider
     ws.merge_cells(start_row=_r, start_column=_S, end_row=_r, end_column=_S + 2)
     ws.cell(row=_r, column=_S).fill = PatternFill("solid", fgColor="C3D9F5")
-    ws.row_dimensions[_r].height = 4
+    ws.row_dimensions[_r].height = 22
     _r += 1
 
     # Section 3 — Profit / Loss

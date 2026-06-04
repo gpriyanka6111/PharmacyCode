@@ -123,7 +123,7 @@ def apply_common_sheet_settings(
             "title": "{pharmacy} ({range}) - Do Not Order",
             "font_size": 25,
             "min_row_for_height": 3,
-            "orientation": "portrait",
+            "orientation": "landscape",
         },
     }
 

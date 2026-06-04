@@ -157,29 +157,31 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc,
     unmapped_rows = src_norm[src_norm['__BIN'] == '000000'].copy()
     fill_col = find_fill_date_column(unmapped_rows)
 
-    ws2.merge_cells('F1:L1')
+    ws2.merge_cells('F1:M1')
     title = ws2.cell(row=1, column=6, value="Unmapped BIN Numbers (000000)")
     title.alignment = Alignment(horizontal="center", vertical="center")
     title.font = Font(bold=True, size=14)
     ws2['F2'] = "BIN"
     ws2['G2'] = "RX #"
-    ws2['H2'] = "Fill Date"
-    ws2['I2'] = "Plan 1 Name"
-    ws2['J2'] = "Ins Paid Plan 1"
-    ws2['K2'] = "Plan 2 Name"
-    ws2['L2'] = "Ins Paid Plan 2"
+    ws2['H2'] = "Drug Name"
+    ws2['I2'] = "Fill Date"
+    ws2['J2'] = "Plan 1 Name"
+    ws2['K2'] = "Ins Paid Plan 1"
+    ws2['L2'] = "Plan 2 Name"
+    ws2['M2'] = "Ins Paid Plan 2"
 
     # Style + widths
-    for col in ['F', 'G', 'H', 'I', 'J', 'K', 'L']:
+    for col in ['F', 'G', 'H', 'I', 'J', 'K', 'L', 'M']:
         head = ws2[f'{col}2']
         head.font = Font(bold=True, color="000000")
         head.alignment = Alignment(horizontal="center", vertical="center")
         ws2.column_dimensions[col].width = 18
-    ws2.column_dimensions['H'].width = 14
-    ws2.column_dimensions['I'].width = 25
-    ws2.column_dimensions['J'].width = 18
-    ws2.column_dimensions['K'].width = 25
-    ws2.column_dimensions['L'].width = 18
+    ws2.column_dimensions['H'].width = 40
+    ws2.column_dimensions['I'].width = 14
+    ws2.column_dimensions['J'].width = 25
+    ws2.column_dimensions['K'].width = 18
+    ws2.column_dimensions['L'].width = 25
+    ws2.column_dimensions['M'].width = 18
 
     # Coerce date (for pretty output); safe even if mixed types
     if fill_col:
@@ -195,20 +197,20 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc,
             unmapped_rows[pay_col] = pd.to_numeric(
                 unmapped_rows[pay_col], errors='coerce').fillna(0).round(2)
 
-    # Write ALL rows (no set()/groupby dedupe): F=BIN, G=RX #, H=Fill Date
+    # Write ALL rows (no set()/groupby dedupe): F=BIN, G=RX #, H=Drug Name, I=Fill Date
     start_row_unmapped = 3
     optional_unmapped_cols = [
-        (8, fill_col),
-        (9, 'Plan 1 Name'),
-        (10, 'Ins Paid Plan 1'),
-        (11, 'Plan 2 Name'),
-        (12, 'Ins Paid Plan 2'),
+        (9, fill_col),
+        (10, 'Plan 1 Name'),
+        (11, 'Ins Paid Plan 1'),
+        (12, 'Plan 2 Name'),
+        (13, 'Ins Paid Plan 2'),
     ]
     optional_unmapped_cols = [
         (col_idx, col_name) for col_idx, col_name in optional_unmapped_cols
         if col_name and col_name in unmapped_rows.columns
     ]
-    cols = ['__BIN', 'Rx #'] + [col_name for _, col_name in optional_unmapped_cols]
+    cols = ['__BIN', 'Rx #', 'Drug Name'] + [col_name for _, col_name in optional_unmapped_cols]
 
     for r_idx, row in enumerate(
             unmapped_rows[cols].itertuples(index=False, name=None),
@@ -216,7 +218,8 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc,
         # F -> BIN (000000)
         ws2.cell(row=r_idx, column=6, value=row[0])
         ws2.cell(row=r_idx, column=7, value=str(row[1]))          # G -> RX #
-        for (col_idx, col_name), v in zip(optional_unmapped_cols, row[2:]):
+        ws2.cell(row=r_idx, column=8, value=row[2])               # H -> Drug Name
+        for (col_idx, col_name), v in zip(optional_unmapped_cols, row[3:]):
             # format Timestamp nicely
             if col_name == fill_col and hasattr(v, "strftime"):
                 v = v.strftime('%Y-%m-%d')
@@ -227,4 +230,4 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc,
     ws2.column_dimensions['B'].width = 30
     ws2.column_dimensions['C'].width = 10
     ws2.freeze_panes = 'A3'  # keep title+headers fixed
-    ws2.auto_filter.ref = "F2:L2"
+    ws2.auto_filter.ref = "F2:M2"
