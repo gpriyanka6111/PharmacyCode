@@ -56,14 +56,25 @@ def _build_kinray_price_table(kinray_df, max_month):
     price_filled = full_grid.merge(price_table, on=['NDC_norm', 'Month'], how='left')
 
     # ffill = backward search, bfill = forward search
-    price_filled = (price_filled
-        .sort_values(['NDC_norm', 'Month'])
-        .groupby('NDC_norm', group_keys=False)
-        .apply(lambda g: g.assign(
-            __unit_price__=g['__unit_price__'].ffill().bfill()
-        ))
-        .reset_index(drop=True)
-    )
+    try:
+        price_filled = (price_filled
+            .sort_values(['NDC_norm', 'Month'])
+            .groupby('NDC_norm', group_keys=False)
+            .apply(lambda g: g.assign(
+                __unit_price__=g['__unit_price__'].ffill().bfill()
+            ), include_groups=False)
+            .reset_index(drop=True)
+        )
+    except TypeError:
+        # pandas < 2.2 doesn't support include_groups
+        price_filled = (price_filled
+            .sort_values(['NDC_norm', 'Month'])
+            .groupby('NDC_norm', group_keys=False)
+            .apply(lambda g: g.assign(
+                __unit_price__=g['__unit_price__'].ffill().bfill()
+            ))
+            .reset_index(drop=True)
+        )
 
     return price_filled[['NDC_norm', 'Month', '__unit_price__']]
 
@@ -199,6 +210,23 @@ def add_rx_unit_compare_sheet_exact(
     _num_cols = out.select_dtypes(include='number').columns
     out[_num_cols] = out[_num_cols].round(2)
 
+    # Compute summary stats (before sheet creation so out is fully built)
+    _total_rx_analyzed = len(out)
+    _kinray_price_col  = 'Kinray Price (Pkgs Billed × Unit Price)'
+    _rx_with_price = int((out[_kinray_price_col] > 0).sum()) if _kinray_price_col in out.columns else 0
+    _rx_no_price   = _total_rx_analyzed - _rx_with_price
+    _diff_col = out['Difference'] if 'Difference' in out.columns else pd.Series([], dtype=float)
+    _diff_num  = pd.to_numeric(_diff_col, errors='coerce').fillna(0)
+    _overpaid_count  = int((_diff_num > 0).sum())
+    _underpaid_count = int((_diff_num < 0).sum())
+    _overpaid_amt    = float(_diff_num[_diff_num > 0].sum())
+    _underpaid_amt   = float(_diff_num[_diff_num < 0].sum())
+    if _kinray_price_col in out.columns:
+        _priced_mask = out[_kinray_price_col] > 0
+        _profit_loss = float(_diff_num[_priced_mask.values].sum())
+    else:
+        _profit_loss = 0.0
+
     # # If no underpaid rows, create placeholder sheet
     # if out.empty:
     #     if sheet_name in wb.sheetnames:
@@ -218,7 +246,7 @@ def add_rx_unit_compare_sheet_exact(
     t = ws.cell(row=1, column=1, value="RX Comparision Analysis (All RXs)")
     t.alignment = Alignment(horizontal='center', vertical='center')
     t.font = Font(size=16, bold=True)
-    ws.row_dimensions[1].height = 26
+    ws.row_dimensions[1].height = 32   # title row
 
     # Write table
     for r_idx, row in enumerate(dataframe_to_rows(out, index=False, header=True), start=2):
@@ -248,7 +276,9 @@ def add_rx_unit_compare_sheet_exact(
         'Total Ins Paid for Pkgs Billed = (Ins Paid + SDRA + COPAY)': 24,
         'Difference': 14, 'BIN': 8, 'Processor': 15, 'PCN': 12, 'Group': 12
     }
-    ws.row_dimensions[2].height = 50
+    ws.row_dimensions[2].height = 55   # header row
+    ws.sheet_format.defaultRowHeight = 15
+    ws.sheet_format.customHeight = False  # let Excel auto-size data rows
 
     for i, name in enumerate(out_cols, start=1):
         ws.column_dimensions[get_column_letter(i)].width = widths.get(name, 12)
@@ -276,6 +306,7 @@ def add_rx_unit_compare_sheet_exact(
 
     # Ensure Excel recalculates when opening
     ws.parent.calculation.fullCalcOnLoad = True
+
     # Freeze panes
     ws.freeze_panes = "A3"
     diff_col_letter = get_column_letter(out_cols.index("Difference") + 1)
@@ -300,6 +331,96 @@ def add_rx_unit_compare_sheet_exact(
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
     ws.sheet_properties.pageSetUpPr.fitToPage = True
+
+    # ── RX Comparison Summary box (placed 2 cols right of data) ──
+    _S = len(out_cols) + 2  # column P when out_cols has 14 cols
+    _money = '"$"#,##0.00'
+    _count = '#,##0'
+
+    def _sum_cell(ws, row, col, value, fill_hex, font_color="1A202C",
+                  bold=False, num_fmt=None, label=False):
+        c = ws.cell(row=row, column=col, value=value)
+        c.fill      = PatternFill("solid", fgColor=fill_hex)
+        c.font      = Font(bold=bold, color=font_color, size=10)
+        c.alignment = Alignment(
+            horizontal='left' if label else 'center',
+            vertical='center', wrap_text=True)
+        if num_fmt:
+            c.number_format = num_fmt
+        return c
+
+    # Header
+    ws.merge_cells(start_row=1, start_column=_S, end_row=1, end_column=_S + 2)
+    hdr = ws.cell(row=1, column=_S, value="RX COMPARISON SUMMARY")
+    hdr.fill      = PatternFill("solid", fgColor="0F4C81")
+    hdr.font      = Font(bold=True, color="FFFFFF", size=11)
+    hdr.alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[1].height = 28
+
+    # Section 1 — RX counts
+    _rows_s1 = [
+        ("Total RX Analyzed",      _total_rx_analyzed, _count, "E8F2FF", "185FA5"),
+        ("Kinray Price Available",  _rx_with_price,     _count, "EAF3DE", "375623"),
+        ("No Kinray Price",         _rx_no_price,       _count, "FAEEDA", "854F0B"),
+    ]
+    _r = 2
+    for label, val, fmt, fill, color in _rows_s1:
+        _sum_cell(ws, _r, _S,     label, fill, color, label=True)
+        _sum_cell(ws, _r, _S + 1, val,   fill, color, num_fmt=fmt)
+        ws.merge_cells(start_row=_r, start_column=_S + 1,
+                       end_row=_r, end_column=_S + 2)
+        ws.row_dimensions[_r].height = 20
+        _r += 1
+
+    # Divider
+    ws.merge_cells(start_row=_r, start_column=_S, end_row=_r, end_column=_S + 2)
+    ws.cell(row=_r, column=_S).fill = PatternFill("solid", fgColor="C3D9F5")
+    ws.row_dimensions[_r].height = 4
+    _r += 1
+
+    # Section 2 — Overpaid / Underpaid
+    _sum_cell(ws, _r, _S,     "Overpaid (Ins > Kinray)", "EAF3DE", "375623", bold=True, label=True)
+    _sum_cell(ws, _r, _S + 1, _overpaid_count, "EAF3DE", "375623", num_fmt=_count)
+    _sum_cell(ws, _r, _S + 2, _overpaid_amt,   "EAF3DE", "375623", num_fmt=_money)
+    ws.row_dimensions[_r].height = 22
+    _r += 1
+
+    _sum_cell(ws, _r, _S,     "Underpaid (Ins < Kinray)", "FCEBEB", "A32D2D", bold=True, label=True)
+    _sum_cell(ws, _r, _S + 1, _underpaid_count, "FCEBEB", "A32D2D", num_fmt=_count)
+    _sum_cell(ws, _r, _S + 2, _underpaid_amt,   "FCEBEB", "A32D2D", num_fmt=_money)
+    ws.row_dimensions[_r].height = 22
+    _r += 1
+
+    # Divider
+    ws.merge_cells(start_row=_r, start_column=_S, end_row=_r, end_column=_S + 2)
+    ws.cell(row=_r, column=_S).fill = PatternFill("solid", fgColor="C3D9F5")
+    ws.row_dimensions[_r].height = 4
+    _r += 1
+
+    # Section 3 — Profit / Loss
+    ws.merge_cells(start_row=_r, start_column=_S, end_row=_r, end_column=_S + 2)
+    pl_fill  = "EAF3DE" if _profit_loss >= 0 else "FCEBEB"
+    pl_color = "375623" if _profit_loss >= 0 else "A32D2D"
+    pl_cell  = ws.cell(row=_r, column=_S,
+                       value=f"Profit / Loss of {_rx_with_price:,} RX")
+    pl_cell.fill      = PatternFill("solid", fgColor=pl_fill)
+    pl_cell.font      = Font(bold=True, color=pl_color, size=11)
+    pl_cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    ws.row_dimensions[_r].height = 22
+    _r += 1
+
+    ws.merge_cells(start_row=_r, start_column=_S, end_row=_r, end_column=_S + 2)
+    pl_val              = ws.cell(row=_r, column=_S, value=_profit_loss)
+    pl_val.fill         = PatternFill("solid", fgColor=pl_fill)
+    pl_val.font         = Font(bold=True, color=pl_color, size=14)
+    pl_val.alignment    = Alignment(horizontal='center', vertical='center')
+    pl_val.number_format = _money
+    ws.row_dimensions[_r].height = 28
+
+    # Column widths for summary columns
+    ws.column_dimensions[get_column_letter(_S)].width     = 22  # label
+    ws.column_dimensions[get_column_letter(_S + 1)].width = 12  # count
+    ws.column_dimensions[get_column_letter(_S + 2)].width = 14  # amount
 
 
 def add_mfp_drugs_sheet(

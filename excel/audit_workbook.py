@@ -98,16 +98,18 @@ def generate_master_audit_workbook(final_df, pharmacy_name, date_range, output_d
         if sort_col not in df.columns:
             return pd.DataFrame(columns=[
                 "Rank", "Insurance", "NDC #", "Drug Name", "Package Size",
-                "Qty Billed", "Packages Billed", "Total Purchased",
-                "Difference", "Actual $ Paid", "Amount to be Paid to Insurance (If Audit)",
+                f"Pkgs Billed to {pr}", "Total Pkgs Purchased",
+                f"Pkgs Difference for {pr}", f"Actual $ Paid by {pr}",
+                "Amount to be Paid to Insurance (If Audit)",
             ])
 
         df = df[df[sort_col] > 0].copy()
         if df.empty:
             return pd.DataFrame(columns=[
                 "Rank", "Insurance", "NDC #", "Drug Name", "Package Size",
-                "Qty Billed", "Packages Billed", "Total Purchased",
-                "Difference", "Actual $ Paid", "Amount to be Paid to Insurance (If Audit)",
+                f"Pkgs Billed to {pr}", "Total Pkgs Purchased",
+                f"Pkgs Difference for {pr}", f"Actual $ Paid by {pr}",
+                "Amount to be Paid to Insurance (If Audit)",
             ])
 
         # 🔑 reset index so values line up row-by-row
@@ -121,28 +123,18 @@ def generate_master_audit_workbook(final_df, pharmacy_name, date_range, output_d
         out["NDC #"]           = df.get("NDC #", "")
         out["Drug Name"]       = df.get("Drug Name", "")
         out["Package Size"]    = df.get("Package Size", "")
-        out["Qty Billed"]      = df.get(col_q, 0)
-        out["Packages Billed"] = df.get(col_p, 0)
-        out["Total Purchased"] = df.get("Total Purchased", 0)
-        out["Difference"]      = df.get(col_d, 0)
-        out["Actual $ Paid"]   = df.get(col_t, 0)
+        out[f"Pkgs Billed to {pr}"]          = df.get(col_p, 0)
+        out["Total Pkgs Purchased"]           = df.get("Total Purchased", 0)
+        out[f"Pkgs Difference for {pr}"]      = df.get(col_d, 0)
+        out[f"Actual $ Paid by {pr}"]          = df.get(col_t, 0)  # hidden helper for formula
         out["Amount to be Paid to Insurance (If Audit)"] = 0
 
         # Clean <NA> → proper numbers / blanks
-        num_cols  = ["Rank", "Qty Billed", "Packages Billed",
-                 "Total Purchased", "Difference", "Actual $ Paid", "Amount to be Paid to Insurance (If Audit)"]
+        num_cols  = ["Rank", f"Pkgs Billed to {pr}", "Total Pkgs Purchased",
+                     f"Pkgs Difference for {pr}", f"Actual $ Paid by {pr}",
+                     "Amount to be Paid to Insurance (If Audit)"]
         text_cols = ["Insurance", "NDC #", "Drug Name", "Package Size"]
 
-        #Rename Qty Billed to Qty Billed to {pr}
-        out.rename(columns={"Qty Billed": f"Qty Billed to {pr}"}, inplace=True)
-        #Rename Packages Billed to Packages Billed to {pr}
-        out.rename(columns={"Packages Billed": f"Packages Billed to {pr}"}, inplace=True)
-        #Rename Total Purchased to Total Qty Purchased
-        out.rename(columns={"Total Purchased": "Total Qty Purchased"}, inplace=True)
-        #Rename Difference to Qty Difference for {pr}
-        out.rename(columns={"Difference": f"Qty Difference for {pr}"}, inplace=True)
-        #Rename Actual $ Paid to Actual $ Paid by {pr}
-        out.rename(columns={"Actual $ Paid": f"Actual $ Paid by {pr} (BestRX)"}, inplace=True)
         for c in num_cols:
             if c in out.columns:
                 out[c] = pd.to_numeric(out[c], errors="coerce").fillna(0)
@@ -159,7 +151,7 @@ def generate_master_audit_workbook(final_df, pharmacy_name, date_range, output_d
         if df is None or df.empty:
             # Even if empty, give a subtitle (merged row 2) if requested
             if subtitle:
-                empty_last_col = len(df.columns) if (df is not None and hasattr(df, 'columns') and len(df.columns) > 0) else 11
+                empty_last_col = len(df.columns) if (df is not None and hasattr(df, 'columns') and len(df.columns) > 0) else 9
                 ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=empty_last_col)
                 c2 = ws.cell(row=2, column=1, value=subtitle)
                 c2.font = Font(size=15, bold=True)
@@ -212,60 +204,56 @@ def generate_master_audit_workbook(final_df, pharmacy_name, date_range, output_d
                     cell.alignment = Alignment(horizontal='left', vertical='center')
                 cell.border = thin_border
 
-        # ---- Column K formula: per-row audit estimate (negative only) ----
-        # =IFERROR(IF((ROUND((J4/G4)*I4,1))<0,(ROUND((J4/G4)*I4,1)),0),0)
-        if last_col >= 11:
+        # ---- Column J formula: per-row audit estimate (I/F)*H, negative only ----
+        if last_col >= 10:
             for r_idx in range(4, ws.max_row + 1):
-                k_cell = ws.cell(row=r_idx, column=11)
-                k_cell.value = f"=IFERROR(IF((ROUND((J{r_idx}/G{r_idx})*I{r_idx},1))<0,(ROUND((J{r_idx}/G{r_idx})*I{r_idx},1)),0),0)"
-                k_cell.border = thin_border
+                j_cell = ws.cell(row=r_idx, column=10)
+                j_cell.value = f"=IFERROR(IF((ROUND((I{r_idx}/F{r_idx})*H{r_idx},1))<0,(ROUND((I{r_idx}/F{r_idx})*H{r_idx},1)),0),0)"
+                j_cell.border = thin_border
 
-        # ---- Column-specific formatting: E..K ----
+        # ---- Column-specific formatting: E..J ----
         # E: Package Size
-        # F: Qty Billed
-        # G: Packages Billed
-        # H: Total Purchased
-        # I: Difference
-        # J: Actual $ Paid
-        # K: Amount to be Paid to Insurance (If Audit)
+        # F: Pkgs Billed to {pr}
+        # G: Total Pkgs Purchased
+        # H: Pkgs Difference for {pr}  (plain number)
+        # I: Actual $ Paid (hidden helper)
+        # J: Amount to be Paid to Insurance (If Audit)
         first_data_row = 4
         last_data_row = ws.max_row
 
         accounting_fmt = '$#,##0.00;[Red]-$#,##0.00'
 
         for row in ws.iter_rows(min_row=first_data_row, max_row=last_data_row,
-                                min_col=5, max_col=min(11, last_col)):
+                                min_col=5, max_col=min(10, last_col)):
             for cell in row:
-                # Center alignment & 2 decimal format
                 cell.alignment = Alignment(
                     horizontal='center',
                     vertical='center',
-                    wrap_text=(cell.column == 11)
+                    wrap_text=(cell.column == 10)
                 )
                 if isinstance(cell.value, (int, float)):
-                    if cell.column in (10, 11):
+                    if cell.column in (9, 10):    # I=Actual $ Paid, J=Amount to be Paid
                         cell.number_format = accounting_fmt
                     else:
-                        cell.number_format = "0.00"
-
-        if last_col >= 11:
-            for r_idx in range(first_data_row, last_data_row + 1):
-                ws.cell(row=r_idx, column=11).number_format = accounting_fmt
+                        cell.number_format = '0.00'  # plain number for all others including H
 
         if last_col >= 10:
             for r_idx in range(first_data_row, last_data_row + 1):
                 ws.cell(row=r_idx, column=10).number_format = accounting_fmt
+        if last_col >= 9:
+            for r_idx in range(first_data_row, last_data_row + 1):
+                ws.cell(row=r_idx, column=9).number_format = accounting_fmt
 
-        # ---- Conditional formatting: highlight negatives in E..K ----
+        # ---- Conditional formatting: highlight negatives in E..I ----
         red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
         red_font = Font(color="9C0006")
-        rng_neg = f"E{first_data_row}:{get_column_letter(min(11, last_col))}{last_data_row}"
+        rng_neg = f"E{first_data_row}:{get_column_letter(min(10, last_col))}{last_data_row}"
         ws.conditional_formatting.add(
             rng_neg,
             CellIsRule(operator="lessThan", formula=["0"], stopIfTrue=False, fill=red_fill, font=red_font)
         )
 
-        # ---- Auto-sum row at bottom (F..K) ----
+        # ---- Auto-sum row at bottom (F..I) ----
         total_row = last_data_row + 1
         total_fill = PatternFill(start_color="FFF2CC", end_color="FFF2CC", fill_type="solid")
         ws.cell(row=total_row, column=5, value="TOTAL").font = Font(bold=True)
@@ -273,13 +261,15 @@ def generate_master_audit_workbook(final_df, pharmacy_name, date_range, output_d
         ws.cell(row=total_row, column=5).border = thin_border
         ws.cell(row=total_row, column=5).fill = total_fill
 
-        for c_idx in range(6, min(11, last_col) + 1):
+        for c_idx in range(6, min(10, last_col) + 1):
+            if c_idx == 9:
+                continue  # skip hidden Actual $ Paid column
             col_letter = get_column_letter(c_idx)
             tcell = ws.cell(row=total_row, column=c_idx)
             tcell.value = f"=SUM({col_letter}{first_data_row}:{col_letter}{last_data_row})"
             tcell.font = Font(bold=True)
-            tcell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=(c_idx == 11))
-            if c_idx in (10, 11):
+            tcell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=(c_idx == 10))
+            if c_idx in (9, 10):
                 tcell.number_format = accounting_fmt
             else:
                 tcell.number_format = "0.00"
@@ -287,26 +277,26 @@ def generate_master_audit_workbook(final_df, pharmacy_name, date_range, output_d
             tcell.fill = total_fill
 
         # ---- Bottom quick metrics ----
-        if last_col >= 11:
+        if last_col >= 10:
             audited_count_row = total_row + 1
             exposure_row = total_row + 2
 
-            ws.cell(row=audited_count_row, column=10, value="Audited Drugs Count").font = Font(bold=True)
-            ws.cell(row=audited_count_row, column=10).alignment = Alignment(horizontal='right', vertical='center')
+            ws.cell(row=audited_count_row, column=9, value="Audited Drugs Count").font = Font(bold=True)
+            ws.cell(row=audited_count_row, column=9).alignment = Alignment(horizontal='right', vertical='center')
+            ws.cell(row=audited_count_row, column=9).border = thin_border
+            ws.cell(row=audited_count_row, column=10, value=f"=COUNTIF(J{first_data_row}:J{last_data_row},\"<0\")")
+            ws.cell(row=audited_count_row, column=10).font = Font(bold=True)
+            ws.cell(row=audited_count_row, column=10).alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
             ws.cell(row=audited_count_row, column=10).border = thin_border
-            ws.cell(row=audited_count_row, column=11, value=f"=COUNTIF(K{first_data_row}:K{last_data_row},\"<0\")")
-            ws.cell(row=audited_count_row, column=11).font = Font(bold=True)
-            ws.cell(row=audited_count_row, column=11).alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-            ws.cell(row=audited_count_row, column=11).border = thin_border
 
-            ws.cell(row=exposure_row, column=10, value="Total Audit Exposure").font = Font(bold=True)
-            ws.cell(row=exposure_row, column=10).alignment = Alignment(horizontal='right', vertical='center')
+            ws.cell(row=exposure_row, column=9, value="Total Audit Exposure").font = Font(bold=True)
+            ws.cell(row=exposure_row, column=9).alignment = Alignment(horizontal='right', vertical='center')
+            ws.cell(row=exposure_row, column=9).border = thin_border
+            ws.cell(row=exposure_row, column=10, value=f"=SUMIF(J{first_data_row}:J{last_data_row},\"<0\",J{first_data_row}:J{last_data_row})")
+            ws.cell(row=exposure_row, column=10).font = Font(bold=True)
+            ws.cell(row=exposure_row, column=10).alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            ws.cell(row=exposure_row, column=10).number_format = accounting_fmt
             ws.cell(row=exposure_row, column=10).border = thin_border
-            ws.cell(row=exposure_row, column=11, value=f"=SUMIF(K{first_data_row}:K{last_data_row},\"<0\",K{first_data_row}:K{last_data_row})")
-            ws.cell(row=exposure_row, column=11).font = Font(bold=True)
-            ws.cell(row=exposure_row, column=11).alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-            ws.cell(row=exposure_row, column=11).number_format = accounting_fmt
-            ws.cell(row=exposure_row, column=11).border = thin_border
 
         # ---- Auto column widths ----
         for col_idx in range(1, last_col + 1):
@@ -322,24 +312,24 @@ def generate_master_audit_workbook(final_df, pharmacy_name, date_range, output_d
                     max_len = len(txt)
             ws.column_dimensions[col_letter].width = min(max_len + 2, 50)
 
-        ws.column_dimensions['A'].width = 5   # Rank
-        ws.column_dimensions['B'].width = 12  # Insurance
-        ws.column_dimensions['C'].width = 12  # NDC #
-        ws.column_dimensions['D'].width = 35  # Drug Name
-        ws.column_dimensions['E'].width = 8  # Package Size
-        ws.column_dimensions['F'].width = 12  # Qty Billed
-        ws.column_dimensions['G'].width = 12  # Packages Billed
-        ws.column_dimensions['H'].width = 12  # Total Purchased
-        ws.column_dimensions['I'].width = 12  # Difference
-        ws.column_dimensions['J'].width = 15  # Actual $ Paid
-        if last_col >= 11:
-            ws.column_dimensions['K'].width = 15  # Amount to be Paid to Insurance (If Audit)
+        ws.column_dimensions['A'].width = 5    # Rank
+        ws.column_dimensions['B'].width = 12   # Insurance
+        ws.column_dimensions['C'].width = 14   # NDC #
+        ws.column_dimensions['D'].width = 35   # Drug Name
+        ws.column_dimensions['E'].width = 8    # Package Size
+        ws.column_dimensions['F'].width = 14   # Pkgs Billed to {pr}
+        ws.column_dimensions['G'].width = 14   # Total Pkgs Purchased
+        ws.column_dimensions['H'].width = 14   # Pkgs Difference for {pr}
+        ws.column_dimensions['I'].width = 14   # Actual $ Paid (hidden helper)
+        ws.column_dimensions['I'].hidden = True
+        ws.column_dimensions['J'].width = 18   # Amount to be Paid to Insurance (If Audit)
+
         # ---- Freeze panes at row 4 (row 1–3 fixed) ----
         ws.freeze_panes = "E4"
 
         # ---- Enable filter on header row (row 3) ----
-        if last_col >= 11:
-            ws.auto_filter.ref = f"A3:K{last_data_row}"
+        if last_col >= 10:
+            ws.auto_filter.ref = f"A3:J{last_data_row}"
         else:
             ws.auto_filter.ref = f"A3:{get_column_letter(last_col)}{last_data_row}"
          # ---- 📄 Page setup: Landscape + fit all columns on one page width ----

@@ -146,11 +146,11 @@ def build_processed_data_sheet(wb, ws, final, desired_columns, processors,
                 "Package Size Billed = Quantity Billed(BestRx) ÷ Package Size")
     _merge_band(2, pk_d_s, pk_d_e,
                 "Package Size Difference = Total Packages Purchased(Vendors) − Package Size Billed(BestRx)")
-    _merge_band(2, paid_s, paid_e, "Actual $ Paid by Insurance = BestRX")
+    _merge_band(2, paid_s, paid_e, "Actual $ Paid by Insurance for Pkgs Billed(BestRX)")
     _merge_band(2, pur_s,  pur_e,
-                "Actual $ Purchased (Kinray Unit Price × Packages Billed To Ins)")
+                "Actual $ Purchased(Kinray Unit Price × Packages Billed To Ins) (If 100%)")
     _merge_band(2, net_s,  net_e,
-                "Net(Profit/Loss)$ = Actual $ Paid(BestRx) − Actual $ Purchased(Kinray)")
+                "Net(Profit/Loss)$ (If 100%) = Actual $ Paid(BestRx) − Actual $ Purchased(Kinray)")
 
     # Column B alignment set via column_dimensions only — no per-cell loop needed
 
@@ -274,6 +274,20 @@ def build_processed_data_sheet(wb, ws, final, desired_columns, processors,
             row_range,
             FormulaRule(formula=[formula],
                         stopIfTrue=False, fill=row_fill_soft)
+        )
+
+    # Red fill on Total Purchased = 0 — FormulaRule works on xlsxwriter numeric values
+    _tp_idx = header_map.get('Total Purchased')
+    if _tp_idx:
+        _tp_letter = get_column_letter(_tp_idx)
+        _tp_range  = f"{_tp_letter}{data_first_row}:{_tp_letter}{data_last_row}"
+        ws.conditional_formatting.add(
+            _tp_range,
+            FormulaRule(
+                formula=[f"{_tp_letter}{data_first_row}=0"],
+                stopIfTrue=False,
+                fill=PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+            )
         )
 
     # AutoFilter managed by Table below

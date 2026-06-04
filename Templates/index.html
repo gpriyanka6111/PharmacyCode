@@ -273,10 +273,10 @@
 
             <!-- File 2: ALL PBM — CSV only -->
             <div>
-              <div class="file-slot" id="slot_all_pbm">
+              <div class="file-slot is-required" id="slot_all_pbm">
                 <div class="slot-header">
                   <span class="slot-file-label">File #2 — BestRx ALL PBM</span>
-                  <span class="badge-opt">Optional</span>
+                  <span class="badge-req">Required</span>
                 </div>
                 <div class="slot-body" onclick="document.getElementById('all_pbm').click()">
                   <i class="bi bi-file-earmark-spreadsheet slot-icon"></i>
@@ -286,7 +286,7 @@
                 </div>
                 <span class="csv-only-note"><i class="bi bi-info-circle me-1"></i>CSV only — Excel may crash on large files</span>
               </div>
-              <input type="file" id="all_pbm" name="all_pbm" accept=".csv" style="display:none">
+              <input type="file" id="all_pbm" name="all_pbm" accept=".csv" style="display:none" required>
               <div class="invalid-feedback d-block" data-feedback-for="all_pbm"></div>
             </div>
 
@@ -645,7 +645,7 @@ function validateUpload(){
   uploadForm.classList.add('was-validated');
   if(!uploadForm.checkValidity()) return false;
   uploadForm.addEventListener('submit',e=>e.preventDefault());
-  const reqIds=['custom_log','bin_master','kinray_file'];
+  const reqIds=['custom_log','bin_master','kinray_file','all_pbm'];
   for(const id of reqIds){
     const input=document.getElementById(id);
     const fb=document.querySelector(`[data-feedback-for="${id}"]`);

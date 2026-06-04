@@ -311,18 +311,20 @@ def add_summary_sheet(
     if kinray_df is not None and log_df is not None:
         try:
             kdf = kinray_df.copy()
-            _ndc_col   = 'NDC #'     if 'NDC #'     in kdf.columns else None
-            _type_col  = 'Vendor'    if 'Vendor'    in kdf.columns else None
-            _price_col = 'PRICE'     if 'PRICE'     in kdf.columns else None
-            _ship_col  = 'Shipped'   if 'Shipped'   in kdf.columns else None
-            _desc_col  = 'Drug Name' if 'Drug Name' in kdf.columns else None
-            _size_col  = next(
-                (c for c in kdf.columns if str(c).strip().lower() in {
-                    'size', 'pkg size', 'package size', 'drug pkg size'
-                }),
-                None
-            )
-            _date_col  = 'DATE'      if 'DATE'      in kdf.columns else None
+            _ndc_col   = next((c for c in kdf.columns if str(c).strip().lower() in {
+                                'ndc/upc', 'ndc #', 'ndc', 'upc'}), None)
+            _type_col  = next((c for c in kdf.columns if str(c).strip().lower() in {
+                                'type', 'vendor', 'drug type'}), None)
+            _price_col = next((c for c in kdf.columns if str(c).strip().lower() in {
+                                'invoice $', 'price', 'invoice$', 'cost', 'total cost'}), None)
+            _ship_col  = next((c for c in kdf.columns if str(c).strip().lower() in {
+                                'ship qty', 'shipped', 'qty', 'quantity', 'ship quantity'}), None)
+            _desc_col  = next((c for c in kdf.columns if str(c).strip().lower() in {
+                                'description', 'drug name', 'desc', 'item description'}), None)
+            _size_col  = next((c for c in kdf.columns if str(c).strip().lower() in {
+                                'size', 'pkg size', 'package size', 'drug pkg size'}), None)
+            _date_col  = next((c for c in kdf.columns if str(c).strip().lower() in {
+                                'invoice date', 'date', 'inv date', 'invoice_date'}), None)
             if _ndc_col is None:
                 raise ValueError("No NDC column found in kinray_df")
             kdf['NDC_norm'] = (
@@ -330,8 +332,16 @@ def add_summary_sheet(
                 .str.replace(r'\D', '', regex=True)
                 .str.zfill(11)
             )
+            _log_ndc_col = next(
+                (c for c in log_df.columns if str(c).strip().lower() in {
+                    'drug ndc', 'ndc #', 'ndc', 'ndc/upc'
+                }),
+                None
+            )
+            if _log_ndc_col is None:
+                raise ValueError("No NDC column found in log_df")
             billed_ndcs = set(
-                log_df['NDC #'].astype(str)
+                log_df[_log_ndc_col].astype(str)
                 .str.replace(r'\D', '', regex=True)
                 .str.zfill(11)
                 .unique()
@@ -356,9 +366,18 @@ def add_summary_sheet(
                 valid_ndc_mask = kdf_agg['NDC_norm'].str.replace('0', '').str.len() > 0
 
                 type_source = kinray_raw if kinray_raw is not None else kinray_df
-                if type_source is not None and 'TYPE' in type_source.columns:
-                    _type_df = type_source[['NDC #', 'TYPE']].copy()
-                    _type_df['NDC_norm'] = (_type_df['NDC #'].astype(str)
+                _src_type_col = next(
+                    (c for c in (type_source.columns if type_source is not None else [])
+                     if str(c).strip().lower() in {'type', 'vendor', 'drug type'}), None
+                )
+                _src_ndc_col = next(
+                    (c for c in (type_source.columns if type_source is not None else [])
+                     if str(c).strip().lower() in {'ndc/upc', 'ndc #', 'ndc', 'upc'}), None
+                )
+                if type_source is not None and _src_type_col and _src_ndc_col:
+                    _type_df = type_source[[_src_ndc_col, _src_type_col]].copy()
+                    _type_df.columns = ['NDC_raw', 'TYPE']
+                    _type_df['NDC_norm'] = (_type_df['NDC_raw'].astype(str)
                                             .str.replace(r'\D', '', regex=True).str.zfill(11))
                     ndc_type_map = (_type_df.groupby('NDC_norm')['TYPE']
                                     .agg(lambda x: x.mode()[0] if not x.mode().empty else '')
@@ -376,11 +395,16 @@ def add_summary_sheet(
 
                 # Enrich brand table with drug names and pkg sizes where possible
                 drug_name_map = {}
+                _log_drug_col = next(
+                    (c for c in log_df.columns if str(c).strip().lower() in {
+                        'drug name', 'drug_name', 'description', 'name'
+                    }), None
+                )
                 # First try log_df Drug Name
-                if 'Drug Name' in log_df.columns:
+                if _log_drug_col:
                     drug_name_map = dict(zip(
-                        log_df['NDC #'].astype(str).str.replace(r'\D', '', regex=True).str.zfill(11),
-                        log_df['Drug Name'].astype(str)
+                        log_df[_log_ndc_col].astype(str).str.replace(r'\D', '', regex=True).str.zfill(11),
+                        log_df[_log_drug_col].astype(str)
                     ))
                 # Also build from Kinray Description column as fallback
                 kinray_name_map = {}
@@ -393,19 +417,19 @@ def add_summary_sheet(
                 if final_data is not None and 'NDC #' in final_data.columns and 'Package Size' in final_data.columns:
                     pkg_size_map = dict(zip(
                         final_data['NDC #'].astype(str).str.replace(r'\D', '', regex=True).str.zfill(11),
-                        pd.to_numeric(final_data['Package Size'], errors='coerce')
+                        final_data['Package Size'].astype(str)
                     ))
-                # Build from Kinray Pkg Size column (now in kdf_agg)
+                # Build from Kinray Pkg Size column (keep as string — values like "30 EA", "3 ML")
                 kinray_size_map = {}
                 if 'Pkg Size' in kdf_agg.columns:
                     kinray_size_map = dict(zip(
                         kdf_agg['NDC_norm'].astype(str),
-                        pd.to_numeric(kdf_agg['Pkg Size'], errors='coerce')
+                        kdf_agg['Pkg Size'].astype(str).str.strip()
                     ))
                 elif _size_col:
                     kinray_size_map = dict(zip(
                         kdf['NDC_norm'].astype(str),
-                        pd.to_numeric(kdf[_size_col], errors='coerce')
+                        kdf[_size_col].astype(str).str.strip()
                     ))
                 date_map = {}
                 if _date_col:
@@ -472,6 +496,10 @@ def add_summary_sheet(
         c.font      = Font(bold=True, color=TEXT_PURPLE, size=10)
         c.alignment = Alignment(horizontal='center', vertical='center')
     ws.row_dimensions[31].height = 18
+
+    # Auto filter on brand drugs table header row
+    _brand_n_cols = 7  # Drug Name, NDC, Pkg Size, Invoice Date, Qty Purchased, Total Cost, Type
+    ws.auto_filter.ref = f"A31:{get_column_letter(_brand_n_cols)}31"
 
     # Brand drug data rows
     current_row    = 32
@@ -570,7 +598,7 @@ def add_summary_sheet(
     proc_headers = [
         'Processor',
         'Insurance $ (BestRx)',
-        '100% Purchased (Kinray)',
+        '100% Kinray (Purchased Only)',
         'Net (Paid−Purchased)',
         'Order Est. from Sheet ($)',
     ]

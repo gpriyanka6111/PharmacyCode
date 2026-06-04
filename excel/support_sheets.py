@@ -138,7 +138,6 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc,
     ws2.column_dimensions['A'].width = 12
     ws2.column_dimensions['B'].width = 28
     ws2.column_dimensions['C'].width = 10
-    ws2.auto_filter.ref = f"A2:C{ws2.max_row}"
     ws2.freeze_panes = "A3"
 
     # # Optional: bottom TOTAL row (helps you QA against expected 7,100 etc.)
@@ -223,13 +222,9 @@ def create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc,
                 v = v.strftime('%Y-%m-%d')
             ws2.cell(row=r_idx, column=col_idx, value=v)
 
-    # Filter across all populated table and unmapped columns.
-    last_col_letter = 'L'
-    ws2.auto_filter.ref = f"A2:{last_col_letter}{ws2.max_row}"
-
     # ---- Formatting
     ws2.column_dimensions['A'].width = 12
     ws2.column_dimensions['B'].width = 30
     ws2.column_dimensions['C'].width = 10
     ws2.freeze_panes = 'A3'  # keep title+headers fixed
-    ws2.auto_filter.ref = f"A2:L{ws2.max_row}"
+    ws2.auto_filter.ref = "F2:L2"

@@ -619,7 +619,7 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         print(f"[DEBUG] Final dataframe columns before order helper sheets: {list(final.columns)}")
         for helper_name, helper_func, helper_kwargs in [
             ("Needs to be ordered - All", add_max_difference_sheet, {"kinray_df": all_vendor_df}),
-            ("Do Not Order - ALL", min_difference_sheet, {}),
+            ("Do Not Order - ALL", min_difference_sheet, {"kinray_df": all_vendor_df}),
         ]:
             try:
                 helper_func(wb, final, **helper_kwargs)
@@ -726,35 +726,41 @@ def process_custom_log_data(custom_log_path, bin_master_path, vendor_paths, phar
         ws.auto_filter.ref = f"A{header_row}:{get_column_letter(ws.max_column)}{ws.max_row}"
 
     # Tab colors per sheet
-    tab_colors = {
-        "Summary":                   "0F4C81",
-        "Processed Data":            "1F6B75",
-        "Needs to be ordered - All": "C45911",
-        "Do Not Order - ALL":        "C00000",
-        "Never Ordered - Check":     "7030A0",
-        "RX Comparison - All":       "375623",
-        "MFP Drugs - RX":            "1F3864",
-        "BIN to Processor":          "595959",
-    }
-    for sheet in wb.worksheets:
-        if sheet.title in tab_colors:
-            sheet.sheet_properties.tabColor = tab_colors[sheet.title]
+    try:
+        tab_colors = {
+            "Summary":                   "0F4C81",
+            "Processed Data":            "1F6B75",
+            "Needs to be ordered - All": "C45911",
+            "Do Not Order - ALL":        "C00000",
+            "Never Ordered - Check":     "7030A0",
+            "RX Comparison - All":       "375623",
+            "MFP Drugs - RX":            "1F3864",
+            "BIN to Processor":          "595959",
+        }
+        for sheet in wb.worksheets:
+            if sheet.title in tab_colors:
+                sheet.sheet_properties.tabColor = tab_colors[sheet.title]
+    except Exception as e:
+        print(f'[DEBUG] Tab color error: {e}')
 
     # Reorder sheets
-    sheet_order = [
-        "Processed Data",
-        "BIN to Processor",
-        "Summary",
-        "Needs to be ordered - All",
-        "Do Not Order - ALL",
-        "RX Comparison - All",
-        "MFP Drugs - RX",
-        "Never Ordered - Check",
-    ]
-    wb._sheets.sort(
-        key=lambda s: sheet_order.index(s.title)
-        if s.title in sheet_order else 99
-    )
+    try:
+        sheet_order = [
+            "Processed Data",
+            "BIN to Processor",
+            "Summary",
+            "Needs to be ordered - All",
+            "Do Not Order - ALL",
+            "RX Comparison - All",
+            "MFP Drugs - RX",
+            "Never Ordered - Check",
+        ]
+        wb._sheets.sort(
+            key=lambda s: sheet_order.index(s.title)
+            if s.title in sheet_order else 99
+        )
+    except Exception as e:
+        print(f'[DEBUG] Sheet ordering error: {e}')
 
     wb.save(output_file)
     unblock_file(output_file)

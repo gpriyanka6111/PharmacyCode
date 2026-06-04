@@ -105,10 +105,36 @@ def upload_file():
 
     if not _is_csv(custom_log_file) or not _is_csv(bin_master_file):
         return "Custom Log, ALL PBM, and BIN Master must be CSV", 400
-    if all_pbm_file and all_pbm_file.filename and not _is_csv(all_pbm_file):
-        return "Custom Log, ALL PBM, and BIN Master must be CSV", 400
     if not _is_vendor_file(kinray_file):
         return "Kinray file must be CSV or Excel", 400
+
+    # Kinray is mandatory
+    kinray_file = request.files.get('kinray_file')
+    if not kinray_file or kinray_file.filename == '':
+        return jsonify({
+            "ok": False,
+            "error": "Kinray vendor file is required. Please upload a Kinray CSV or Excel file."
+        }), 400
+    kinray_ext = os.path.splitext(kinray_file.filename)[1].lower()
+    if kinray_ext not in ('.csv', '.xlsx', '.xls'):
+        return jsonify({
+            "ok": False,
+            "error": "Kinray file must be CSV or Excel (.csv, .xlsx, .xls)"
+        }), 400
+
+    # ALL PBM is mandatory
+    all_pbm_file = request.files.get('all_pbm')
+    if not all_pbm_file or all_pbm_file.filename == '':
+        return jsonify({
+            "ok": False,
+            "error": "ALL PBM file is required. Please upload the ALL PBM CSV file."
+        }), 400
+    all_pbm_ext = os.path.splitext(all_pbm_file.filename)[1].lower()
+    if all_pbm_ext not in ('.csv',):
+        return jsonify({
+            "ok": False,
+            "error": "ALL PBM file must be a CSV file."
+        }), 400
 
     # ---- Save uploads to per-job dir ----
     updir = current_app.config['UPLOAD_FOLDER']
@@ -617,6 +643,19 @@ def finalize_job():
         return jsonify({"ok": False, "error": "Invalid job_id"}), 404
 
     paths = ctx["paths"]
+
+    if not paths.get('kinray'):
+        return jsonify({
+            "ok": False,
+            "error": "Kinray file is missing from session. Please re-upload and try again."
+        }), 400
+
+    if not paths.get('all_pbm'):
+        return jsonify({
+            "ok": False,
+            "error": "ALL PBM file is missing from session. Please re-upload and try again."
+        }), 400
+
     processed_dir = os.path.join(
         current_app.root_path, current_app.config.get('PROCESSED_FOLDER', 'processed'))
     os.makedirs(processed_dir, exist_ok=True)
