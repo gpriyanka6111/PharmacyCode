@@ -6,7 +6,6 @@ from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.pagebreak import PageBreak
-from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
 def _safe_display_index(display_columns, column_name, context):
@@ -271,13 +270,6 @@ def min_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=None):
     if first_print_col:
         _set_print_area_after_repeated_cols(ws, first_print_col, len(display_columns))
     ws.auto_filter.ref = f"A2:{get_column_letter(len(display_columns))}{ws.max_row}"
-    n_cols = len(display_columns)
-    tab = Table(displayName="TableDoNotOrder",
-                ref=f"A2:{get_column_letter(n_cols)}{last_row}")
-    tab.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium9", showRowStripes=True,
-        showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
-    ws.add_table(tab)
 
 
 def add_max_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=None):
@@ -724,9 +716,3 @@ def add_max_difference_sheet(wb, final_data, insurance_paths=None, kinray_df=Non
 
     # === Filter range limited to data only (keeps footer fixed) ===
     ws.auto_filter.ref = f"A2:{get_column_letter(len(display_columns))}{last_data_row}"
-    tab = Table(displayName="TableNeedsOrder",
-                ref=f"A2:{get_column_letter(len(display_columns))}{last_data_row}")
-    tab.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium9", showRowStripes=True,
-        showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
-    ws.add_table(tab)

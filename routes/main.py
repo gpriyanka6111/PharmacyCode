@@ -31,6 +31,47 @@ from processing.vendor_parser import read_vendor_file
 
 bp = Blueprint('main', __name__)
 
+# ── PIN authentication ──
+_CORRECT_PIN = '1947'
+_pin_attempts = 0
+_pin_unlocked = False  # single process flag — works perfectly with FlaskWebGUI
+
+@bp.route('/pin')
+def pin_page():
+    if _pin_unlocked:
+        return redirect(url_for('main.index'))
+    return render_template('pin.html', error=None)
+
+@bp.route('/verify_pin', methods=['POST'])
+def verify_pin():
+    global _pin_attempts, _pin_unlocked
+    entered = request.form.get('pin','').strip()
+    if entered == _CORRECT_PIN:
+        _pin_unlocked = True
+        _pin_attempts = 0
+        return redirect(url_for('main.index'))
+    _pin_attempts += 1
+    if _pin_attempts >= 3:
+        import threading, os, signal
+        threading.Timer(1.0, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
+        return render_template('pin.html', error='Too many attempts. Closing…')
+    left = 3 - _pin_attempts
+    return render_template('pin.html', error=f'Incorrect PIN — {left} attempt{"s" if left!=1 else ""} left')
+
+@bp.before_request
+def require_pin():
+    path = request.path
+    if path.startswith('/static') or path in ('/pin', '/verify_pin', '/shutdown'):
+        return
+    if not _pin_unlocked:
+        return redirect(url_for('main.pin_page'))
+
+@bp.route('/shutdown', methods=['GET','POST'])
+def shutdown():
+    import threading, os, signal
+    threading.Timer(0.3, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
+    return ('', 204)
+
 # keep small "job context" between /upload -> /review -> /finalize
 _JOB_CACHE = {}  # { job_id: { "paths": {...}, "summary": {...}, "pharmacy_name":..., "date_range":... } }
 

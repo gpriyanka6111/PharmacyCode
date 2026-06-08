@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>RxInsight — Unlock</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0f4c81;font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;}
+    .pin-box{background:#fff;border-radius:20px;padding:40px 44px 36px;text-align:center;width:340px;box-shadow:0 24px 60px rgba(0,0,0,0.25);}
+    .pin-logo{width:64px;height:64px;border-radius:14px;background:#0f4c81;display:inline-grid;place-items:center;margin-bottom:18px;}
+    .pin-logo span{color:#fff;font-family:Georgia,serif;font-size:24px;font-weight:700;}
+    .pin-title{font-size:1.25rem;font-weight:700;color:#1a202c;margin-bottom:4px;}
+    .pin-sub{font-size:0.88rem;color:#64748b;margin-bottom:24px;}
+    .pin-dots{display:flex;justify-content:center;gap:14px;margin-bottom:28px;}
+    .pin-dot{width:18px;height:18px;border-radius:50%;border:2px solid #e2e8f0;background:#fff;transition:0.2s all;}
+    .pin-dot.filled{background:#0f4c81;border-color:#0f4c81;}
+    .pin-dot.error{background:#ef4444;border-color:#ef4444;}
+    .pin-keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+    .pin-key{height:52px;border-radius:10px;border:1.5px solid #e2e8f0;background:#f8fafc;font-size:1.2rem;font-weight:600;color:#1a202c;cursor:pointer;font-family:'DM Sans',sans-serif;transition:0.12s all;}
+    .pin-key:hover{background:#e8f2ff;border-color:#0f4c81;color:#0f4c81;}
+    .pin-key:active{transform:scale(0.95);}
+    .pin-key.del{font-size:1rem;color:#64748b;}
+    .pin-key.zero{grid-column:2;}
+    .pin-error{font-size:0.85rem;color:#ef4444;font-weight:500;margin-top:14px;min-height:20px;}
+    .pin-error.success{color:#00c48c;}
+  </style>
+</head>
+<body>
+<div class="pin-box">
+  <div class="pin-logo"><span>Rx</span></div>
+  <div class="pin-title">Welcome back</div>
+  <div class="pin-sub">Enter your 4-digit PIN to continue</div>
+  <div class="pin-dots">
+    <div class="pin-dot" id="pd0"></div>
+    <div class="pin-dot" id="pd1"></div>
+    <div class="pin-dot" id="pd2"></div>
+    <div class="pin-dot" id="pd3"></div>
+  </div>
+  <div class="pin-keypad">
+    <button class="pin-key" data-v="1">1</button>
+    <button class="pin-key" data-v="2">2</button>
+    <button class="pin-key" data-v="3">3</button>
+    <button class="pin-key" data-v="4">4</button>
+    <button class="pin-key" data-v="5">5</button>
+    <button class="pin-key" data-v="6">6</button>
+    <button class="pin-key" data-v="7">7</button>
+    <button class="pin-key" data-v="8">8</button>
+    <button class="pin-key" data-v="9">9</button>
+    <button class="pin-key del" data-v="del">⌫</button>
+    <button class="pin-key zero" data-v="0">0</button>
+  </div>
+  <div class="pin-error" id="pinMsg">{% if error %}<span style="color:#ef4444">{{ error }}</span>{% endif %}</div>
+</div>
+
+<form id="pinForm" method="POST" action="/verify_pin" style="display:none">
+  <input type="hidden" name="pin" id="pinInput"/>
+</form>
+
+<script>
+var buf = '';
+function dot(i){ return document.getElementById('pd'+i); }
+function msg(){ return document.getElementById('pinMsg'); }
+function inp(){ return document.getElementById('pinInput'); }
+
+function updateDots(){
+  for(var i=0;i<4;i++){
+    var d=dot(i);
+    d.className='pin-dot'+(i<buf.length?' filled':'');
+  }
+}
+function addDigit(k){
+  if(buf.length>=4) return;
+  buf+=k;
+  updateDots();
+  if(buf.length===4){
+    inp().value=buf;
+    document.getElementById('pinForm').submit();
+  }
+}
+function delDigit(){
+  buf=buf.slice(0,-1);
+  updateDots();
+  msg().textContent='';
+}
+
+// Button clicks
+document.querySelectorAll('[data-v]').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var v=btn.getAttribute('data-v');
+    if(v==='del') delDigit();
+    else addDigit(v);
+  });
+});
+
+// Keyboard
+document.addEventListener('keydown',function(e){
+  if(e.key>='0'&&e.key<='9') addDigit(e.key);
+  else if(e.key==='Backspace') delDigit();
+});
+</script>
+</body>
+</html>

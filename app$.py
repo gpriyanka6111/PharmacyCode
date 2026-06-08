@@ -75,6 +75,7 @@ screen_width, screen_height = get_screen_dimensions()
 
 app = Flask(__name__, template_folder='templates')
 app.static_folder = 'static'
+app.secret_key = 'rxinsight-hilda-2024-secure'
 
 # window = webview.create_window('Pharmacy Data Processing Application',app)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER

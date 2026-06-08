@@ -4,7 +4,6 @@ from openpyxl.formatting.rule import CellIsRule, FormulaRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter, range_boundaries
 from openpyxl.worksheet.page import PageMargins
-from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from excel.support_sheets import create_bin_to_processor_sheet
 
@@ -416,24 +415,9 @@ def build_processed_data_sheet(wb, ws, final, desired_columns, processors,
 
     # Set the title of the active worksheet
     ws.title = "Processed Data"
-
-    # ── Thin borders via Excel Table (zero performance cost) ──
     _last_row = ws.max_row
     _last_col = ws.max_column
-    # Remove auto_filter first — Table manages its own filter
-    ws.auto_filter.ref = None
-    _tab = Table(
-        displayName="TableProcessedData",
-        ref=f"A3:{get_column_letter(_last_col)}{_last_row}"
-    )
-    _tab.tableStyleInfo = TableStyleInfo(
-        name="TableStyleMedium9",
-        showRowStripes=True,
-        showFirstColumn=False,
-        showLastColumn=False,
-        showColumnStripes=False
-    )
-    ws.add_table(_tab)
+    ws.auto_filter.ref = f"A3:{get_column_letter(_last_col)}{_last_row}"
 
     # ws.protection.sheet = True
     create_bin_to_processor_sheet(wb, rx_compare_source, bin_to_proc,

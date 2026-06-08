@@ -6,7 +6,6 @@ from openpyxl.formatting.rule import CellIsRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
 def _build_kinray_price_table(kinray_df, max_month):
@@ -560,15 +559,7 @@ def add_mfp_drugs_sheet(
         tcell.number_format = '"$"#,##0.00'
         tcell.alignment = Alignment(horizontal='center', vertical='center')
         tcell.border = thin
-
-    # Add table for borders and row stripes
-    tab = Table(displayName="TableMFPDrugs",
-                ref=f"A2:{get_column_letter(len(out_cols))}{last_data_row}")
-    tab.tableStyleInfo = TableStyleInfo(
-        name="TableStyleLight2", showRowStripes=True,
-        showFirstColumn=False, showLastColumn=False, showColumnStripes=False)
-    ws.add_table(tab)
-    ws.auto_filter.ref = None  # Table manages filter
+    ws.auto_filter.ref = f"A2:{get_column_letter(len(out_cols))}{last_data_row}"
 
     ws.sheet_format.defaultRowHeight = 20
     ws.sheet_format.customHeight = True
